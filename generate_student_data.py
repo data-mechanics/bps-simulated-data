@@ -69,13 +69,16 @@ for sr in sf.iterShapeRecords():
 
 # map a list of residences to its zip code
 zipcodes = {zc:[] for zc in zipcode_polygons}
-
-for k, residence in residences[:100]:
+count = 0
+for k, residence in residences:
+    if count % 1000 == 0:
+        print(count)
     res_lat, res_lng = residence['geometry']['coordinates']
     for zc, polygon in zipcode_polygons.items():
         if point_in_poly(res_lat, res_lng, polygon):
             zipcodes[zc].append((k, residence))
             break
+    count += 1
 
 with open('zipcodes.json', 'w') as f:
-    f.write(zipcodes)
+    f.write(json.dumps(zipcodes))
