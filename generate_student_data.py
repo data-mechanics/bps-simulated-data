@@ -92,18 +92,41 @@ def percentages_csv_to_json(file_prefix):
     txt = json.dumps(zip_to_percentages, indent=2)
     open(file_prefix + '.json', 'w').write(txt)
 
+def zip_to_school_to_location(file_prefix):
+    bps_to_cob = json.loads(open('school-names-bps-to-cob.json', 'r').read())
+    cob_to_bps = {v:k for k,v in bps_to_cob.items()}
+    rows = open(file_prefix + '.csv', 'r').read().split("\n")
+    fields = rows[0].split(",")
+    rows = [dict(zip(fields, row.split(","))) for row in rows[1:]]
+    zips = {row['ZIPCODE'] for row in rows[1:] if 'SCH_LABEL' in row}
+    zip_to_cob_name_to_loc = {
+        z:{
+            cob_to_bps[r['SCH_LABEL'].strip()]: (float(r['X']), float(r['Y'])) 
+            for r in rows[1:] 
+            if 'SCH_LABEL' in r 
+                and r['SCH_LABEL'].strip() in cob_to_bps 
+                and z == r['ZIPCODE']
+          }
+        for z in zips
+      }
+    return zip_to_cob_name_to_loc
+
 def students_simulate(file_prefix_properties, file_prefix_percentages, file_prefix_students):
     properties = json.loads(open(file_prefix_properties + '.json', 'r').read())
     percentages = json.loads(open(file_prefix_percentages + '.json', 'r').read())
+    schools = zip_to_school_to_location('schools')
     features = []
     for zip in percentages.keys() & properties.keys():
-        for location in tqdm(random.sample(properties[zip], percentages[zip]['total'])):
-            geometry = location[1]['geometry']
-            (x, y) = (geometry['coordinates'][0], geometry['coordinates'][1])
-            geometry['coordinates'][1] = x
-            geometry['coordinates'][0] = y
-            props = {}
-            features.append(geojson.Feature(geometry=geometry, properties=props))
+        for location in tqdm(random.sample(properties[zip], int(0.3 * percentages[zip]['total']))):
+            if zip in schools and len(schools[zip]) > 0:
+                start = tuple(reversed(location[1]['geometry']['coordinates']))
+                end = tuple(random.choice(list(schools[zip].items()))[1])
+                geometry = geojson.Point(start)
+                geometry = geojson.LineString([start, end])
+                features.append(geojson.Feature(geometry=geometry, properties={}))
+            else:
+                pass
+                #print(zip)
     open(file_prefix_students + '.geojson', 'w').write(geojson.dumps(geojson.FeatureCollection(features), indent=2))
     return geojson.FeatureCollection(features)
 
@@ -113,5 +136,7 @@ def main():
     percentages_csv_to_json('student-zip-school-percentages')
     students = students_simulate('properties-by-zipcode', 'student-zip-school-percentages', 'students')
     open('students.html', 'w').write(geoleaflet.html(students))
+
+main()
 
 ## eof
