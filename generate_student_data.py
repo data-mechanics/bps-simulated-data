@@ -3,6 +3,7 @@ import random
 import zipfile
 import json
 import geojson
+import geopy.distance
 import shapefile # pyshp library
 import pyproj
 from tqdm import tqdm
@@ -111,28 +112,42 @@ def zip_to_school_to_location(file_prefix):
       }
     return zip_to_cob_name_to_loc
 
+def choice_weighted(choices):
+   (r, t) = (random.uniform(0, sum(w for (c,w) in choices)), 0)
+   for (c, w) in choices:
+      if t + w >= r:
+         return c
+      t += w
+
 def students_simulate(file_prefix_properties, file_prefix_percentages, file_prefix_students):
-    properties = json.loads(open(file_prefix_properties + '.json', 'r').read())
+    props = json.loads(open(file_prefix_properties + '.json', 'r').read())
     percentages = json.loads(open(file_prefix_percentages + '.json', 'r').read())
     schools = zip_to_school_to_location('schools')
+    schools_to_location = {school:schools[zip][school] for zip in schools for school in schools[zip]}
     features = []
-    for zip in percentages.keys() & properties.keys():
-        for location in tqdm(random.sample(properties[zip], int(0.3 * percentages[zip]['total']))):
-            if zip in schools and len(schools[zip]) > 0:
-                start = tuple(reversed(location[1]['geometry']['coordinates']))
-                end = tuple(random.choice(list(schools[zip].items()))[1])
-                geometry = geojson.Point(start)
-                geometry = geojson.LineString([start, end])
-                features.append(geojson.Feature(geometry=geometry, properties={}))
-            else:
-                pass
-                #print(zip)
+    for zip in percentages.keys() & props.keys():
+        if zip in schools and len(schools[zip]) > 0:
+            for (school, fraction) in tqdm(percentages[zip]['schools'].items()):
+                if school in schools_to_location:
+                    school_loc = schools_to_location[school]
+                    for student in range(int(0.5 * fraction * percentages[zip]['total'])):
+                        locations = list(sorted([(geopy.distance.vincenty(tuple(reversed(prop[1]['geometry']['coordinates'])), school_loc).miles, prop) for prop in random.sample(props[zip], 50)]))
+                        location = locations[0][1]
+                        start = tuple(reversed(location[1]['geometry']['coordinates']))
+                        #end = tuple(random.choice(list(schools[zip].items()))[1])
+                        #end = choice_weighted([(schools_to_location[s], wgt) for (s, wgt) in percentages[zip]['schools'].items() if s in schools_to_location])
+                        end = school_loc
+                        geometry = geojson.Point(start)
+                        geometry = geojson.LineString([start, end])
+                        features.append(geojson.Feature(geometry=geometry, properties={}))
+        else:
+            pass #print(zip)
     open(file_prefix_students + '.geojson', 'w').write(geojson.dumps(geojson.FeatureCollection(features), indent=2))
     return geojson.FeatureCollection(features)
 
 def main():
-    extract_zipcode_data()
-    properties_by_zipcode('properties-by-zipcode')
+    #extract_zipcode_data()
+    #properties_by_zipcode('properties-by-zipcode')
     percentages_csv_to_json('student-zip-school-percentages')
     students = students_simulate('properties-by-zipcode', 'student-zip-school-percentages', 'students')
     open('students.html', 'w').write(geoleaflet.html(students))
