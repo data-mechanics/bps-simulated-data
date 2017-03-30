@@ -8,6 +8,7 @@ import shapefile # pyshp library
 import pyproj
 from tqdm import tqdm
 import geoleaflet
+import xlsxwriter
 
 def point_in_poly(x, y, poly):
     """
@@ -100,9 +101,14 @@ def zip_to_school_to_location(file_prefix):
     zips = {row['zip'] for row in rows[1:]}
     zip_to_name_to_loc = {
         zip:{
-            r['name'].strip(): (float(r['longitude']), float(r['latitude'])) 
-            for r in rows[1:] 
-            if zip == r['zip']
+            r['name'].strip(): {
+                'location': (float(r['longitude']), float(r['latitude'])),
+                'name': r['name'],
+                'address': r['address'],
+                'start': random.choice(['07:30:00', '08:30:00', '09:30:00']),
+                'end': random.choice(['14:10:00', '15:00:00', '15:10:00', '16:00:00', '16:10:00', '17:00:00'])
+              }
+            for r in rows[1:] if zip == r['zip']
           }
         for zip in zips
       }
@@ -112,13 +118,13 @@ def students_simulate(file_prefix_properties, file_prefix_percentages, file_pref
     props = json.loads(open(file_prefix_properties + '.json', 'r').read())
     percentages = json.loads(open(file_prefix_percentages + '.json', 'r').read())
     schools = zip_to_school_to_location('schools')
-    schools_to_location = {school:schools[zip][school] for zip in schools for school in schools[zip]}
+    schools_to_data = {school:schools[zip][school] for zip in schools for school in schools[zip]}
     features = []
     for zip in percentages.keys() & props.keys():
         if zip in schools and len(schools[zip]) > 0:
             for (school, fraction) in tqdm(percentages[zip]['schools'].items()):
-                if school in schools_to_location:
-                    school_loc = schools_to_location[school]
+                if school in schools_to_data:
+                    school_loc = schools_to_data[school]['location']
                     for ty in ['corner', 'd2d']:
                         for student in range(int(1.0 * fraction * percentages[zip][ty])):
                             r = random.randint(1,5)
@@ -132,7 +138,11 @@ def students_simulate(file_prefix_properties, file_prefix_percentages, file_pref
                               'length':geopy.distance.vincenty(start, end).miles,
                               'pickup':ty,
                               'grade':random.choice('K123456'),
-                              'zip':zip
+                              'zip':zip,
+                              'school': schools_to_data[school]['name'],
+                              'school_address': schools_to_data[school]['address'],
+                              'school_start': schools_to_data[school]['start'],
+                              'school_end': schools_to_data[school]['end']
                             }
                             features.append(geojson.Feature(geometry=geometry, properties=properties))
         else:
@@ -141,12 +151,46 @@ def students_simulate(file_prefix_properties, file_prefix_percentages, file_pref
     features = list(reversed(sorted(features, key=lambda f: f['properties']['length'])))
     return geojson.FeatureCollection(features)
 
+def geojson_to_xlsx(geojson_file, xlsx_file):
+    '''
+    Converts a JSON file into an XLSX file.
+    '''
+    xl_workbook = xlsxwriter.Workbook(xlsx_file)
+    xl_bold = xl_workbook.add_format({'bold': True})
+    xl_sheet = xl_workbook.add_worksheet("Student Information")
+    columns = [
+        ('Street Number', lambda f: f['properties'].get('number')),
+        ('Street Name', lambda f: f['properties'].get('street')),
+        ('Zip Code', lambda f: f['properties'].get('zip')),
+        ('Latitude', lambda f: float(f['geometry']['coordinates'][0][0])),
+        ('Longitude', lambda f: float(f['geometry']['coordinates'][0][1])),
+        ('Pickup Type', lambda f: f['properties'].get('pickup')),
+        ('Grade', lambda f: f['properties'].get('grade')),
+        ('Geocode', lambda f: f['properties'].get('geocode')),
+        ('Neighborhood Safety Score', lambda f: f['properties'].get('safety')),
+        ('Proposed Maximium Walk to Stop Distance', lambda f: f['properties'].get('walk')),
+        ('Assigned School', lambda f: f['properties'].get('school')),
+        ('Current School Start Time', lambda f: f['properties'].get('school_start')),
+        ('Current School End Time', lambda f: f['properties'].get('school_end')),
+        ('School Address', lambda f: f['properties'].get('school_address')),
+        ('School Latitude', lambda f: float(f['geometry']['coordinates'][1][0])),
+        ('School Longitude', lambda f: float(f['geometry']['coordinates'][1][1]))
+      ]
+    features = json.loads(open(geojson_file).read())['features']
+    for i in range(0, len(columns)):
+        xl_sheet.write(0, i, columns[i][0], xl_bold)
+    for i in tqdm(range(len(features))):
+        for j in range(0,len(columns)):
+            xl_sheet.write(i+1, j, columns[j][1](features[i]))
+    xl_workbook.close()
+
 def main():
     #extract_zipcode_data()
     #properties_by_zipcode('properties-by-zipcode')
     percentages_csv_to_json('student-zip-school-percentages')
     students = students_simulate('properties-by-zipcode', 'student-zip-school-percentages', 'students')
     open('visualization.js', 'w').write('var obj = ' + geojson.dumps(students) + ';')
+    geojson_to_xlsx('students.geojson', 'students.xlsx')
 
 main()
 
