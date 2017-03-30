@@ -26,13 +26,16 @@
           layer.bindPopup(popupContent);
         }*/
       }
+      function len_to_wgt(l) {
+        return Math.max(1-l, 0.2);
+      }
       L.geoJson(obj, {
         filter: function (feature, layer) { return true; },
         onEachFeature: onEachFeature,
-        style: function (feature) { return {"color": randomColor()}; },
+        style: function (feature) { return {"color":randomColor(), weight:len_to_wgt(feature.properties.length)}; },
         pointToLayer:
           function (feature, latlng) {
-            return L.circleMarker(latlng, {radius:4, weight:0.1, fillColor:"#6666AA", color:"#6666AA", opacity:1, fillOpacity:1});
+            return L.circleMarker(latlng, {radius:2, weight:0.1, fillColor:"#6666AA", color:"#6666AA", opacity:1, fillOpacity:1});
           }
       }).addTo(leaflet);
 	</script>
