@@ -16,7 +16,6 @@ def point_in_poly(x, y, poly):
     """
     n = len(poly)
     inside = False
-
     p1x,p1y = poly[0]
     for i in range(n+1):
         p2x,p2y = poly[i % n]
@@ -112,13 +111,6 @@ def zip_to_school_to_location(file_prefix):
       }
     return zip_to_cob_name_to_loc
 
-def choice_weighted(choices):
-   (r, t) = (random.uniform(0, sum(w for (c,w) in choices)), 0)
-   for (c, w) in choices:
-      if t + w >= r:
-         return c
-      t += w
-
 def students_simulate(file_prefix_properties, file_prefix_percentages, file_prefix_students):
     props = json.loads(open(file_prefix_properties + '.json', 'r').read())
     percentages = json.loads(open(file_prefix_percentages + '.json', 'r').read())
@@ -134,23 +126,22 @@ def students_simulate(file_prefix_properties, file_prefix_percentages, file_pref
                         locations = list(sorted([(geopy.distance.vincenty(tuple(reversed(prop[1]['geometry']['coordinates'])), school_loc).miles, prop) for prop in random.sample(props[zip], 50)]))
                         location = locations[0][1]
                         start = tuple(reversed(location[1]['geometry']['coordinates']))
-                        #end = tuple(random.choice(list(schools[zip].items()))[1])
-                        #end = choice_weighted([(schools_to_location[s], wgt) for (s, wgt) in percentages[zip]['schools'].items() if s in schools_to_location])
                         end = school_loc
                         geometry = geojson.Point(start)
                         geometry = geojson.LineString([start, end])
-                        features.append(geojson.Feature(geometry=geometry, properties={}))
+                        properties = {'length': geopy.distance.vincenty(start, end).miles}
+                        features.append(geojson.Feature(geometry=geometry, properties=properties))
         else:
             pass #print(zip)
     open(file_prefix_students + '.geojson', 'w').write(geojson.dumps(geojson.FeatureCollection(features), indent=2))
-    return geojson.FeatureCollection(features)
+    return geojson.FeatureCollection(list(reversed(sorted(features, key=lambda f: f['properties']['length']))))
 
 def main():
     #extract_zipcode_data()
     #properties_by_zipcode('properties-by-zipcode')
     percentages_csv_to_json('student-zip-school-percentages')
     students = students_simulate('properties-by-zipcode', 'student-zip-school-percentages', 'students')
-    open('students.html', 'w').write(geoleaflet.html(students))
+    open('visualization.js', 'w').write('var obj = ' + geojson.dumps(students) + ';')
 
 main()
 
