@@ -24,8 +24,9 @@ def properties_by_zipcode(file_prefix):
 
     boston_zips = {}
     properties = json.load(open(file_prefix + '.geojson', 'r'))
-    for i in tqdm(range(len(properties))):
+    for i in tqdm(properties):
         zipcode = properties[i]['properties']['zipcode']
+        address = properties[i]['properties']['address']
         if zipcode != "NULL" and address != "NULL" and properties[i]['properties']['type'] == 'Residential':
             if zipcode in boston_zips:
                 boston_zips[zipcode][i] = properties[i]
@@ -134,6 +135,7 @@ def students_simulate(file_prefix_properties, file_prefix_percentages, file_pref
                         for student in range(int(1.0 * fraction * percentages[zip][ty])):
                             r = random.randint(1,5)
                             locations = list(sorted([(geopy.distance.vincenty(tuple(reversed(prop['geometry']['coordinates'])), school_loc).miles, prop) for prop in random.sample(list(props[zip].values()), r)], key=lambda t: t[0]))
+                            #locations = [(d,p) for (d,p) in locations if d >= 1] # Only locations more than one mile away.
                             location = locations[0][1]
                             end = school_loc
                             start = tuple(reversed(location['geometry']['coordinates']))
@@ -141,9 +143,9 @@ def students_simulate(file_prefix_properties, file_prefix_percentages, file_pref
                             geometry = geojson.LineString([start, end])
 
                             grade = random.choice('K123456')
-                            geocode = location.get('geocode')[0:-4]
+                            geocode = location.get('geocode')
+                            geocode = geocode[0:-4] if geocode is not None else None
                             safety = neighborhood_safety.get(geocode)
-                            walk = grade_safe_distance[grade][safety] if safety is not None else None
 
                             properties = {
                                 'length':geopy.distance.vincenty(start, end).miles,
@@ -152,7 +154,7 @@ def students_simulate(file_prefix_properties, file_prefix_percentages, file_pref
                                 'grade':grade,
                                 'geocode':geocode,
                                 'safety':safety,
-                                'walk':walk,
+                                'walk':grade_safe_distance[grade][safety] if safety is not None else None,
                                 'school': schools_to_data[school]['name'],
                                 'school_address': schools_to_data[school]['address'],
                                 'school_start': schools_to_data[school]['start'],
@@ -162,7 +164,7 @@ def students_simulate(file_prefix_properties, file_prefix_percentages, file_pref
                                 parts = location['properties']['address'].strip().split(" ")
                                 (number, street) = (parts[0], " ".join(parts[1:]))
                                 properties['number'] = number
-                                properties['street'] = street
+                                properties['street'] = street.split("#")[0].strip() # No unit numbers.
                             features.append(geojson.Feature(geometry=geometry, properties=properties))
         else:
             pass
