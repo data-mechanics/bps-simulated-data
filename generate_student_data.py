@@ -133,39 +133,48 @@ def students_simulate(file_prefix_properties, file_prefix_percentages, file_pref
                     school_loc = schools_to_data[school]['location']
                     for ty in ['corner', 'd2d']:
                         for student in range(int(1.0 * fraction * percentages[zip][ty])):
-                            r = random.randint(1,5)
-                            locations = list(sorted([(geopy.distance.vincenty(tuple(reversed(prop['geometry']['coordinates'])), school_loc).miles, prop) for prop in random.sample(list(props[zip].values()), r)], key=lambda t: t[0]))
-                            #locations = [(d,p) for (d,p) in locations if d >= 1] # Only locations more than one mile away.
-                            location = locations[0][1]
-                            end = school_loc
-                            start = tuple(reversed(location['geometry']['coordinates']))
-                            geometry = geojson.Point(start)
-                            geometry = geojson.LineString([start, end])
+                            r = random.randint(10,20)
+                            locations = [(geopy.distance.vincenty(tuple(reversed(prop['geometry']['coordinates'])), school_loc).miles, prop) for prop in random.sample(list(props[zip].values()), r)]
+                            locations = [(d, p) for (d, p) in locations if d >= 0.65]
+                            locations = list(sorted(locations, key=lambda t: t[0]))
+                            attempts = 0
+                            while len(locations) == 0 and attempts < 100:
+                                attempts += 1
+                                r = min(len(props[zip].values()), r + 10)
+                                locations = [(geopy.distance.vincenty(tuple(reversed(prop['geometry']['coordinates'])), school_loc).miles, prop) for prop in random.sample(list(props[zip].values()), r)]
+                                locations = [(d, p) for (d, p) in locations if d >= 0.65]
+                                locations = list(sorted(locations, key=lambda t: t[0]))
+                            if len(locations) > 0:
+                                location = locations[0][1]
+                                end = school_loc
+                                start = tuple(reversed(location['geometry']['coordinates']))
+                                geometry = geojson.Point(start)
+                                geometry = geojson.LineString([start, end])
 
-                            grade = random.choice('K123456')
-                            geocode = location.get('geocode')
-                            geocode = geocode[0:-4] if geocode is not None else None
-                            safety = neighborhood_safety.get(geocode)
+                                grade = random.choice('K123456')
+                                geocode = location.get('geocode')
+                                geocode = geocode[0:-4] if geocode is not None else None
+                                safety = neighborhood_safety.get(geocode)
 
-                            properties = {
-                                'length':geopy.distance.vincenty(start, end).miles,
-                                'zip':zip,
-                                'pickup':ty,
-                                'grade':grade,
-                                'geocode':geocode,
-                                'safety':safety,
-                                'walk':grade_safe_distance[grade][safety] if safety is not None else None,
-                                'school': schools_to_data[school]['name'],
-                                'school_address': schools_to_data[school]['address'],
-                                'school_start': schools_to_data[school]['start'],
-                                'school_end': schools_to_data[school]['end']
-                              }
-                            if type(location['properties']['address']) == str and len(location['properties']['address'].split(" ")) >= 2:
-                                parts = location['properties']['address'].strip().split(" ")
-                                (number, street) = (parts[0], " ".join(parts[1:]))
-                                properties['number'] = number
-                                properties['street'] = street.split("#")[0].strip() # No unit numbers.
-                            features.append(geojson.Feature(geometry=geometry, properties=properties))
+                                properties = {
+                                    'length':geopy.distance.vincenty(start, end).miles,
+                                    'zip':zip,
+                                    'pickup':ty,
+                                    'grade':grade,
+                                    'geocode':geocode,
+                                    'safety':safety,
+                                    'walk':grade_safe_distance[grade][safety] if safety is not None else None,
+                                    'school': schools_to_data[school]['name'],
+                                    'school_address': schools_to_data[school]['address'],
+                                    'school_start': schools_to_data[school]['start'],
+                                    'school_end': schools_to_data[school]['end']
+                                  }
+                                if type(location['properties']['address']) == str and len(location['properties']['address'].split(" ")) >= 2:
+                                    parts = location['properties']['address'].strip().split(" ")
+                                    (number, street) = (parts[0], " ".join(parts[1:]))
+                                    properties['number'] = number
+                                    properties['street'] = street.split("#")[0].strip() # No unit numbers.
+                                features.append(geojson.Feature(geometry=geometry, properties=properties))
         else:
             pass
     open(file_prefix_students + '.geojson', 'w').write(geojson.dumps(geojson.FeatureCollection(features), indent=2))
