@@ -39,49 +39,72 @@ def extract_zipcode_data():
         with zipfile.ZipFile('zipcodes_nt.zip') as f:
             f.extractall("./zipcodes_nt")
 
+# def properties_by_zipcode(file_prefix):
+#     """
+#     Build a JSON file grouping all properties by zip code.
+#     """
+#     sf = shapefile.Reader('zipcodes_nt/ZIPCODES_NT_POLY')
+#     reverse_coordinate_projection = pyproj.Proj(proj = 'lcc', datum = 'NAD83',
+#                                     lat_1 = 41.71666666666667, lat_2 = 42.68333333333333,
+#                                     lat_0 = 41.0, lon_0 = -71.5,
+#                                     x_0 = 200000.0, y_0 = 750000.0)
+
+#     ZIPFIELD = 0 # Constant for the zipcode field.
+
+#     # Load all residences in Boston.
+#     properties = json.load(open('properties.geojson', 'r'))
+#     residences = [p for p in properties.items() if p[1]['properties']['type'] == 'Residential']
+
+#     # Convert shapefile to dictionary one time.
+#     # The shapefile actually does not contain unique zipcode data so we have to make sure to have multipolygons.
+#     # For now, just ignore the list.
+#     blacklist = ['01434', '01082', '02532', '01002', '01039', '01050', '02467', '01096', '01026', '01011', '01247', '01010', '01235', '01008']
+
+#     zipcode_polygons = {}
+#     for sr in sf.iterShapeRecords():
+#         zc = sr.record[ZIPFIELD] # zip code
+#         if zc in blacklist:
+#             continue # FIX THIS
+#         polygon = []
+#         for x,y in sr.shape.points:
+#             lng, lat = reverse_coordinate_projection(x, y, inverse=True)
+#             polygon.append((lat, lng))
+#         zipcode_polygons[zc] = polygon
+
+#     # Map a list of residences to their zip codes.
+#     zipcodes = {zc:[] for zc in zipcode_polygons}
+#     for k, residence in tqdm(residences):
+#         res_lat, res_lng = residence['geometry']['coordinates']
+#         for zc, polygon in zipcode_polygons.items():
+#             if point_in_poly(res_lat, res_lng, polygon):
+#                 zipcodes[zc].append((k, residence))
+#                 break
+
+#     with open(file_prefix + '.json', 'w') as f:
+#         f.write(json.dumps(zipcodes))
+
 def properties_by_zipcode(file_prefix):
     """
-    Build a JSON file grouping all properties by zip code.
+    Build a JSON file grouping all residential properties by zip code
     """
-    sf = shapefile.Reader('zipcodes_nt/ZIPCODES_NT_POLY')
-    reverse_coordinate_projection = pyproj.Proj(proj = 'lcc', datum = 'NAD83',
-                                    lat_1 = 41.71666666666667, lat_2 = 42.68333333333333,
-                                    lat_0 = 41.0, lon_0 = -71.5,
-                                    x_0 = 200000.0, y_0 = 750000.0)
 
-    ZIPFIELD = 0 # Constant for the zipcode field.
+    boston_zips = {}
 
-    # Load all residences in Boston.
-    properties = json.load(open('properties.geojson', 'r'))
-    residences = [p for p in properties.items() if p[1]['properties']['type'] == 'Residential']
+    properties = json.load(open(file_prefix + '.geojson', 'r'))
 
-    # Convert shapefile to dictionary one time.
-    # The shapefile actually does not contain unique zipcode data so we have to make sure to have multipolygons.
-    # For now, just ignore the list.
-    blacklist = ['01434', '01082', '02532', '01002', '01039', '01050', '02467', '01096', '01026', '01011', '01247', '01010', '01235', '01008']
+    for i in properties:
+        zipcode = properties[i]['properties']['zipcode']
+        if zipcode != "NULL" and properties[i]['properties']['type'] == 'Residential':
+            if zipcode in boston_zips:
+                boston_zips[zipcode][i] = properties[i]
+            else:
+                boston_zips[zipcode] = {}
+                boston_zips[zipcode][i] = properties[i]
+        else:
+            pass
 
-    zipcode_polygons = {}
-    for sr in sf.iterShapeRecords():
-        zc = sr.record[ZIPFIELD] # zip code
-        if zc in blacklist:
-            continue # FIX THIS
-        polygon = []
-        for x,y in sr.shape.points:
-            lng, lat = reverse_coordinate_projection(x, y, inverse=True)
-            polygon.append((lat, lng))
-        zipcode_polygons[zc] = polygon
-
-    # Map a list of residences to their zip codes.
-    zipcodes = {zc:[] for zc in zipcode_polygons}
-    for k, residence in tqdm(residences):
-        res_lat, res_lng = residence['geometry']['coordinates']
-        for zc, polygon in zipcode_polygons.items():
-            if point_in_poly(res_lat, res_lng, polygon):
-                zipcodes[zc].append((k, residence))
-                break
-
-    with open(file_prefix + '.json', 'w') as f:
-        f.write(json.dumps(zipcodes))
+    txt = json.dumps(boston_zips, indent=2)
+    open(file_prefix + '-by-zipcode.json', 'w').write(txt)
 
 def percentages_csv_to_json(file_prefix):
     """
@@ -153,7 +176,7 @@ def students_simulate(file_prefix_properties, file_prefix_percentages, file_pref
                     for ty in ['corner', 'd2d']:
                         for student in range(int(1.0 * fraction * percentages[zip][ty])):
                             r = random.randint(1,5)
-                            locations = list(sorted([(geopy.distance.vincenty(tuple(reversed(prop[1]['geometry']['coordinates'])), school_loc).miles, prop) for prop in random.sample(props[zip], r)]))
+                            locations = list(sorted([(geopy.distance.vincenty(tuple(reversed(prop[i]['geometry']['coordinates'])), school_loc).miles, prop) for prop in random.sample(props[zip], r) for i in prop]))
                             location = locations[0][1]
                             end = school_loc
                             start = tuple(reversed(location[1]['geometry']['coordinates']))
