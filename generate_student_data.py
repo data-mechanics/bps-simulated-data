@@ -1,4 +1,5 @@
 import os
+import requests
 import random
 import zipfile
 import json
@@ -84,12 +85,9 @@ def properties_by_zipcode(file_prefix):
     """
     Build a JSON file grouping all residential properties by zip code
     """
-
     boston_zips = {}
-
     properties = json.load(open(file_prefix + '.geojson', 'r'))
-
-    for i in properties:
+    for i in tqdm(properties):
         zipcode = properties[i]['properties']['zipcode']
         if zipcode != "NULL" and properties[i]['properties']['type'] == 'Residential':
             if zipcode in boston_zips:
@@ -97,9 +95,11 @@ def properties_by_zipcode(file_prefix):
             else:
                 boston_zips[zipcode] = {}
                 boston_zips[zipcode][i] = properties[i]
+            (lat, lon) = properties[i]['geometry']['coordinates']
+            geocode = json.loads(requests.get('http://data.fcc.gov/api/block/find?format=json&latitude=' + str(lat) + '&longitude=' + str(lon) + '&showall=true').text)["Block"]["FIPS"][0:-3]
+            boston_zips[zipcode][i]['geocode'] = geocode
         else:
             pass
-
     txt = json.dumps(boston_zips, indent=2)
     open(file_prefix + '-by-zipcode.json', 'w').write(txt)
 
@@ -255,7 +255,7 @@ def geojson_to_xlsx(geojson_file, xlsx_file):
 
 def main():
     #extract_zipcode_data()
-    #properties_by_zipcode('input_data/properties-by-zipcode')
+    #properties_by_zipcode('input_data/properties')
     percentages_csv_to_json('input_data/student-zip-school-percentages')
     students = students_simulate('input_data/properties-by-zipcode', 'input_data/student-zip-school-percentages', 'students')
     open('visualization.js', 'w').write('var obj = ' + geojson.dumps(students) + ';')
