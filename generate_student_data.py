@@ -144,11 +144,11 @@ def zip_to_school_to_location(file_prefix, school_names_bps_to_cob = 'school-nam
         zip:{
             r['name'].strip(): {
                 'location': (float(r['longitude']), float(r['latitude'])),
-                'name_bps': r['name'],
+                'name': r['name'],
                 'name_cob': (bps_to_cob[r['name']] if r['name'] in bps_to_cob else r['name']),
                 'address': r['address'],
-                # 'start': random.choice(['07:30:00', '08:30:00', '09:30:00']),
-                # 'end': random.choice(['14:10:00', '15:00:00', '15:10:00', '16:00:00', '16:10:00', '17:00:00'])
+                'start': random.choice(['07:30:00', '08:30:00', '09:30:00']),
+                'end': random.choice(['14:10:00', '15:00:00', '15:10:00', '16:00:00', '16:10:00', '17:00:00']),
                 'attendance': sum([math.ceil((zip_student_percentages[z]['schools'][r['name']] if r['name'] in zip_student_percentages[z]['schools'] else 0 ) * zip_student_percentages[z]['total']) for z in zip_student_percentages]),
                 'attendance_share': sum([math.ceil((zip_student_percentages[z]['schools'][r['name']] if r['name'] in zip_student_percentages[z]['schools'] else 0 ) * zip_student_percentages[z]['total']) for z in zip_student_percentages]) / total_students
               }
@@ -196,10 +196,10 @@ def students_simulate(file_prefix_properties, file_prefix_percentages, file_pref
                     for ty in ['corner', 'd2d']:
                         for student in range(int(1.0 * fraction * percentages[zip][ty])):
                             r = random.randint(1,5)
-                            locations = list(sorted([(geopy.distance.vincenty(tuple(reversed(prop[i]['geometry']['coordinates'])), school_loc).miles, prop) for prop in random.sample(props[zip], r) for i in prop]))
+                            locations = list(sorted([(geopy.distance.vincenty(tuple(reversed(prop['geometry']['coordinates'])), school_loc).miles, prop) for prop in random.sample(list(props[zip].values()), r)], key=lambda t: t[0]))
                             location = locations[0][1]
                             end = school_loc
-                            start = tuple(reversed(location[1]['geometry']['coordinates']))
+                            start = tuple(reversed(location['geometry']['coordinates']))
                             geometry = geojson.Point(start)
                             geometry = geojson.LineString([start, end])
                             properties = {
@@ -260,6 +260,6 @@ def main():
     open('visualization.js', 'w').write('var obj = ' + geojson.dumps(students) + ';')
     geojson_to_xlsx('students.geojson', 'students.xlsx')
 
-# main()
+main()
 
 ## eof
