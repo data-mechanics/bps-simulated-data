@@ -4,6 +4,6 @@
 
 # Generated files.
 students.geojson
-student-zip-school-percentages.json
+input_data/student-zip-school-percentages.json
 students.xlsx
 visualization.js
