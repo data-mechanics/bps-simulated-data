@@ -1,3 +1,9 @@
 # Common operating system files.
 .DS_Store
 .Rhistory
+
+# Generated files.
+students.geojson
+student-zip-school-percentages.json
+students.xlsx
+visualization.js
