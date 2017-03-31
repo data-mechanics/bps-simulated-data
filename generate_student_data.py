@@ -144,8 +144,8 @@ def zip_to_school_to_location(file_prefix, school_names_bps_to_cob = 'input_data
                 'name': r['name'],
                 'name_cob': (bps_to_cob[r['name']] if r['name'] in bps_to_cob else r['name']),
                 'address': r['address'],
-                'start': random.choice(['07:30:00', '08:30:00', '09:30:00']),
-                'end': random.choice(['14:10:00', '15:00:00', '15:10:00', '16:00:00', '16:10:00', '17:00:00']),
+                # 'start': random.choice(['07:30:00', '08:30:00', '09:30:00']),
+                # 'end': random.choice(['14:10:00', '15:00:00', '15:10:00', '16:00:00', '16:10:00', '17:00:00']),
                 'attendance': sum([math.ceil((zip_student_percentages[z]['schools'][r['name']] if r['name'] in zip_student_percentages[z]['schools'] else 0 ) * zip_student_percentages[z]['total']) for z in zip_student_percentages]),
                 'attendance_share': sum([math.ceil((zip_student_percentages[z]['schools'][r['name']] if r['name'] in zip_student_percentages[z]['schools'] else 0 ) * zip_student_percentages[z]['total']) for z in zip_student_percentages]) / total_students
               }
@@ -153,25 +153,29 @@ def zip_to_school_to_location(file_prefix, school_names_bps_to_cob = 'input_data
           }
         for zip in zips
       }
-    return zip_to_name_to_loc
+    return school_to_bell_time(zip_to_name_to_loc)
 
-def school_to_bell_time():
+def school_to_bell_time(school_json):
     """
     Takes the school JSON output from zip_to_school_to_location and assigns bell times.
     """
 
-    school_json = zip_to_school_to_location(schools)
-
     attendance_percents = {'07:30:00':0.0, '08:30:00':0.0, '09:30:00':0.0}
     attendance_thresholds = {'07:30:00':40.0, '08:30:00':40.0, '09:30:00':20.0}
 
-    for zip in school_json:
-        for schools in zip:
+    for zipcode in school_json:
+        for schools in school_json[zipcode]:
             while True:
-                selected_time = random.choice(['07:30:00', '08:30:00', '9:30:00'])
+                selected_time = random.choice(['07:30:00', '08:30:00', '09:30:00'])
                 if attendance_percents[selected_time] < attendance_thresholds[selected_time]:
-                    schools['start'] = selected_time
-                    attendance_percents[selected_time] += schools[attendance_share]
+                    school_json[zipcode][schools]['start'] = selected_time
+                    if selected_time == '07:30:00':
+                        school_json[zipcode][schools]['end'] = random.choice(['14:10:00', '15:00:00'])
+                    if selected_time == '08:30:00':
+                        school_json[zipcode][schools]['end'] = random.choice(['15:10:00', '16:00:00'])
+                    if selected_time == '09:30:00':
+                        school_json[zipcode][schools]['end'] = random.choice(['16:10:00', '17:00:00'])
+                    attendance_percents[selected_time] += school_json[zipcode][schools]['attendance_share']
                     break
     return school_json
 
