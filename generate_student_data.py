@@ -9,6 +9,10 @@ import pyproj
 from tqdm import tqdm
 import geoleaflet
 import xlsxwriter
+import math
+
+#current data directory
+os.chdir("./input_data")
 
 def point_in_poly(x, y, poly):
     """
@@ -80,6 +84,9 @@ def properties_by_zipcode(file_prefix):
         f.write(json.dumps(zipcodes))
 
 def percentages_csv_to_json(file_prefix):
+    """
+    Reads the student-zip-school-percentages or equivalent file and outputs it as a json
+    """
     rows = open(file_prefix + '.csv', 'r').read().split("\n")
     fields = rows[0].split("\t")
     rows = [list(zip(fields, row.split("\t"))) for row in tqdm(rows[1:])]
@@ -94,19 +101,33 @@ def percentages_csv_to_json(file_prefix):
     txt = json.dumps(zip_to_percentages, indent=2)
     open(file_prefix + '.json', 'w').write(txt)
 
-def zip_to_school_to_location(file_prefix):
+def zip_to_school_to_location(file_prefix, school_names_bps_to_cob = 'school-names-bps-to-cob', student_zip_school_percentages = 'student-zip-school-percentages'):
+    """
+    Reads the school csv to construct a json with schools ordered by zipcode with BPS and Cob names plus attendance based on the percentages_csv_to_json output data
+    """
     rows = open(file_prefix + '.csv', 'r').read().split("\n")
     fields = rows[0].split("\t")
     rows = [dict(zip(fields, row.split("\t"))) for row in rows[1:]]
     zips = {row['zip'] for row in rows[1:]}
+
+    # Gets school names necessary to go back and forth between BPS and Cob
+    bps_to_cob = json.loads(open(school_names_bps_to_cob + '.json', 'r').read())
+    # Gets attendance data from student_zip_school_percentages
+    zip_student_percentages = json.loads(open(student_zip_school_percentages + '.json', 'r').read())
+    # Calculates total number of students in zip_student_percentages
+    total_students = sum([zip_student_percentages[z]['total'] for z in zip_student_percentages])
+
     zip_to_name_to_loc = {
         zip:{
             r['name'].strip(): {
                 'location': (float(r['longitude']), float(r['latitude'])),
-                'name': r['name'],
+                'name_bps': r['name'],
+                'name_cob': (bps_to_cob[r['name']] if r['name'] in bps_to_cob else r['name']),
                 'address': r['address'],
-                'start': random.choice(['07:30:00', '08:30:00', '09:30:00']),
-                'end': random.choice(['14:10:00', '15:00:00', '15:10:00', '16:00:00', '16:10:00', '17:00:00'])
+                # 'start': random.choice(['07:30:00', '08:30:00', '09:30:00']),
+                # 'end': random.choice(['14:10:00', '15:00:00', '15:10:00', '16:00:00', '16:10:00', '17:00:00'])
+                'attendance': sum([math.ceil((zip_student_percentages[z]['schools'][r['name']] if r['name'] in zip_student_percentages[z]['schools'] else 0 ) * zip_student_percentages[z]['total']) for z in zip_student_percentages]),
+                'attendance_share': sum([math.ceil((zip_student_percentages[z]['schools'][r['name']] if r['name'] in zip_student_percentages[z]['schools'] else 0 ) * zip_student_percentages[z]['total']) for z in zip_student_percentages]) / total_students
               }
             for r in rows[1:] if zip == r['zip']
           }
@@ -115,6 +136,10 @@ def zip_to_school_to_location(file_prefix):
     return zip_to_name_to_loc
 
 def students_simulate(file_prefix_properties, file_prefix_percentages, file_prefix_students):
+    """
+    Reads the properties_by_zip, student-zip-school-percentages to output the generated data
+    """
+
     props = json.loads(open(file_prefix_properties + '.json', 'r').read())
     percentages = json.loads(open(file_prefix_percentages + '.json', 'r').read())
     schools = zip_to_school_to_location('schools')
@@ -192,6 +217,6 @@ def main():
     open('visualization.js', 'w').write('var obj = ' + geojson.dumps(students) + ';')
     geojson_to_xlsx('students.geojson', 'students.xlsx')
 
-main()
+# main()
 
 ## eof
