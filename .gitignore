@@ -7,3 +7,4 @@ students.geojson
 student-zip-school-percentages.json
 students.xlsx
 visualization.js
+input_data/properties-by-zipcode.json
