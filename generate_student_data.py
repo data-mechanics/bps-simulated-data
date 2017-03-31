@@ -11,9 +11,6 @@ import geoleaflet
 import xlsxwriter
 import math
 
-#current data directory
-os.chdir("./input_data")
-
 def point_in_poly(x, y, poly):
     """
     Determine whether a point is inside a given polygon (list of (x,y) pairs).
@@ -124,7 +121,7 @@ def percentages_csv_to_json(file_prefix):
     txt = json.dumps(zip_to_percentages, indent=2)
     open(file_prefix + '.json', 'w').write(txt)
 
-def zip_to_school_to_location(file_prefix, school_names_bps_to_cob = 'school-names-bps-to-cob', student_zip_school_percentages = 'student-zip-school-percentages'):
+def zip_to_school_to_location(file_prefix, school_names_bps_to_cob = 'input_data/school-names-bps-to-cob', student_zip_school_percentages = 'input_data/student-zip-school-percentages'):
     """
     Reads the school csv to construct a json with schools ordered by zipcode with BPS and Cob names plus attendance based on the percentages_csv_to_json output data
     """
@@ -185,7 +182,7 @@ def students_simulate(file_prefix_properties, file_prefix_percentages, file_pref
 
     props = json.loads(open(file_prefix_properties + '.json', 'r').read())
     percentages = json.loads(open(file_prefix_percentages + '.json', 'r').read())
-    schools = zip_to_school_to_location('schools')
+    schools = zip_to_school_to_location('input_data/schools')
     schools_to_data = {school:schools[zip][school] for zip in schools for school in schools[zip]}
     features = []
     for zip in percentages.keys() & props.keys():
@@ -254,9 +251,9 @@ def geojson_to_xlsx(geojson_file, xlsx_file):
 
 def main():
     #extract_zipcode_data()
-    #properties_by_zipcode('properties-by-zipcode')
-    percentages_csv_to_json('student-zip-school-percentages')
-    students = students_simulate('properties-by-zipcode', 'student-zip-school-percentages', 'students')
+    #properties_by_zipcode('input_data/properties-by-zipcode')
+    percentages_csv_to_json('input_data/student-zip-school-percentages')
+    students = students_simulate('input_data/properties-by-zipcode', 'input_data/student-zip-school-percentages', 'students')
     open('visualization.js', 'w').write('var obj = ' + geojson.dumps(students) + ';')
     geojson_to_xlsx('students.geojson', 'students.xlsx')
 
