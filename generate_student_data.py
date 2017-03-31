@@ -158,6 +158,26 @@ def zip_to_school_to_location(file_prefix, school_names_bps_to_cob = 'school-nam
       }
     return zip_to_name_to_loc
 
+def school_to_bell_time():
+    """
+    Takes the school JSON output from zip_to_school_to_location and assigns bell times.
+    """
+
+    school_json = zip_to_school_to_location(schools)
+
+    attendance_percents = {'07:30:00':0.0, '08:30:00':0.0, '09:30:00':0.0}
+    attendance_thresholds = {'07:30:00':40.0, '08:30:00':40.0, '09:30:00':20.0}
+
+    for zip in school_json:
+        for schools in zip:
+            while True:
+                selected_time = random.choice(['07:30:00', '08:30:00', '9:30:00'])
+                if attendance_percents[selected_time] < attendance_thresholds[selected_time]:
+                    schools['start'] = selected_time
+                    attendance_percents[selected_time] += schools[attendance_share]
+                    break
+    return school_json
+
 def students_simulate(file_prefix_properties, file_prefix_percentages, file_prefix_students):
     """
     Reads the properties_by_zip, student-zip-school-percentages to output the generated data
