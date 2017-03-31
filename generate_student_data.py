@@ -13,7 +13,7 @@ def properties_by_zipcode(file_prefix):
     """
     Build a JSON file grouping all residential properties by zip code
     """
-    blocks = geojson.loads(open('input_data/c_bra_bl.geojson').read())    
+    blocks = [f for f in geojson.loads(open('input_data/c_bra_bl.geojson').read())['features'] if f['geometry'] is not None]
     boston_zips = {}
     properties = json.load(open(file_prefix + '.geojson', 'r'))
     for i in tqdm(properties):
@@ -25,14 +25,10 @@ def properties_by_zipcode(file_prefix):
                 boston_zips[zipcode] = {}
                 boston_zips[zipcode][i] = properties[i]
             (lat, lon) = properties[i]['geometry']['coordinates']
-
-            #try:
-            #    for f in blocks['features']:
-            #        if shape(f['geometry']).contains(Point(lat, lon)):
-            #            boston_zips[zipcode][i]['geocode'] = f['properties']['CODE']
-            #            break
-            #except:
-            #    pass
+            for f in blocks:
+                if shape(f['geometry']).contains(Point(lon, lat)):
+                    boston_zips[zipcode][i]['geocode'] = f['properties']['CODE']
+                    break
             #geocode = json.loads(requests.get('http://data.fcc.gov/api/block/find?format=json&latitude=' + str(lat) + '&longitude=' + str(lon) + '&showall=true').text)["Block"]["FIPS"][0:-3]
             #boston_zips[zipcode][i]['geocode'] = geocode
         else:
