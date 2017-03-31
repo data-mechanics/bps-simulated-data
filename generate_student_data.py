@@ -5,29 +5,38 @@ import math
 import json
 import geojson
 import geopy.distance
-from shapely.geometry import shape, Point
+import shapely.geometry
 from tqdm import tqdm
 import xlsxwriter
+import rtree
 
 def properties_by_zipcode(file_prefix):
     """
     Build a JSON file grouping all residential properties by zip code
     """
-    blocks = [f for f in geojson.loads(open('input_data/c_bra_bl.geojson').read())['features'] if f['geometry'] is not None]
+    features_shapes = [(f, shapely.geometry.shape(f['geometry'])) for f in tqdm(geojson.loads(open('input_data/c_bra_bl.geojson').read())['features']) if f['geometry'] is not None]
+
+    # Build R-tree index for the census block shapes.
+    rtidx = rtree.index.Index()
+    for i in tqdm(range(len(features_shapes))):
+        (f, s) = features_shapes[i]
+        rtidx.insert(i, s.bounds)
+
     boston_zips = {}
     properties = json.load(open(file_prefix + '.geojson', 'r'))
-    for i in tqdm(properties):
+    for i in tqdm(range(len(properties))):
         zipcode = properties[i]['properties']['zipcode']
-        if zipcode != "NULL" and properties[i]['properties']['type'] == 'Residential':
+        if zipcode != "NULL" and address != "NULL" and properties[i]['properties']['type'] == 'Residential':
             if zipcode in boston_zips:
                 boston_zips[zipcode][i] = properties[i]
             else:
                 boston_zips[zipcode] = {}
                 boston_zips[zipcode][i] = properties[i]
             (lat, lon) = properties[i]['geometry']['coordinates']
-            for f in blocks:
-                if shape(f['geometry']).contains(Point(lon, lat)):
+            for (f, s) in [features_shapes[i] for i in rtidx.nearest((lon, lat, lon, lat), 1)]:
+                if s.contains(shapely.geometry.Point(lon, lat)):
                     boston_zips[zipcode][i]['geocode'] = f['properties']['CODE']
+                    last = (f, s)
                     break
             #geocode = json.loads(requests.get('http://data.fcc.gov/api/block/find?format=json&latitude=' + str(lat) + '&longitude=' + str(lon) + '&showall=true').text)["Block"]["FIPS"][0:-3]
             #boston_zips[zipcode][i]['geocode'] = geocode
@@ -63,11 +72,9 @@ def zip_to_school_to_location(file_prefix, school_names_bps_to_cob = 'input_data
     rows = [dict(zip(fields, row.split("\t"))) for row in rows[1:]]
     zips = {row['zip'] for row in rows[1:]}
 
-    # Gets school names necessary to go back and forth between BPS and Cob
-    bps_to_cob = json.loads(open(school_names_bps_to_cob + '.json', 'r').read())
-    # Gets attendance data from student_zip_school_percentages
+    # Gets attendance data from student_zip_school_percentages.
     zip_student_percentages = json.loads(open(student_zip_school_percentages + '.json', 'r').read())
-    # Calculates total number of students in zip_student_percentages
+    # Calculates total number of students in zip_student_percentages.
     total_students = sum([zip_student_percentages[z]['total'] for z in zip_student_percentages])
 
     zip_to_name_to_loc = {
@@ -75,10 +82,7 @@ def zip_to_school_to_location(file_prefix, school_names_bps_to_cob = 'input_data
             r['name'].strip(): {
                 'location': (float(r['longitude']), float(r['latitude'])),
                 'name': r['name'],
-                'name_cob': (bps_to_cob[r['name']] if r['name'] in bps_to_cob else r['name']),
                 'address': r['address'],
-                # 'start': random.choice(['07:30:00', '08:30:00', '09:30:00']),
-                # 'end': random.choice(['14:10:00', '15:00:00', '15:10:00', '16:00:00', '16:10:00', '17:00:00']),
                 'attendance': sum([math.ceil((zip_student_percentages[z]['schools'][r['name']] if r['name'] in zip_student_percentages[z]['schools'] else 0 ) * zip_student_percentages[z]['total']) for z in zip_student_percentages]),
                 'attendance_share': sum([math.ceil((zip_student_percentages[z]['schools'][r['name']] if r['name'] in zip_student_percentages[z]['schools'] else 0 ) * zip_student_percentages[z]['total']) for z in zip_student_percentages]) / total_students
               }
@@ -92,10 +96,8 @@ def school_to_bell_time(school_json):
     """
     Takes the school JSON output from zip_to_school_to_location and assigns bell times.
     """
-
     attendance_percents = {'07:30:00':0.0, '08:30:00':0.0, '09:30:00':0.0}
     attendance_thresholds = {'07:30:00':40.0, '08:30:00':40.0, '09:30:00':20.0}
-
     for zipcode in school_json:
         for schools in school_json[zipcode]:
             while True:
@@ -116,7 +118,8 @@ def students_simulate(file_prefix_properties, file_prefix_percentages, file_pref
     """
     Reads the properties_by_zip, student-zip-school-percentages to output the generated data
     """
-
+    neighborhood_safety = json.load(open('input_data/neighborhood-safety.json'))
+    grade_safe_distance = json.load(open('input_data/grade-safe-distance.json'))
     props = json.loads(open(file_prefix_properties + '.json', 'r').read())
     percentages = json.loads(open(file_prefix_percentages + '.json', 'r').read())
     schools = zip_to_school_to_location('input_data/schools')
@@ -136,19 +139,33 @@ def students_simulate(file_prefix_properties, file_prefix_percentages, file_pref
                             start = tuple(reversed(location['geometry']['coordinates']))
                             geometry = geojson.Point(start)
                             geometry = geojson.LineString([start, end])
+
+                            grade = random.choice('K123456')
+                            geocode = location.get('geocode')[0:-4]
+                            safety = neighborhood_safety.get(geocode)
+                            walk = grade_safe_distance[grade][safety] if safety is not None else None
+
                             properties = {
-                              'length':geopy.distance.vincenty(start, end).miles,
-                              'pickup':ty,
-                              'grade':random.choice('K123456'),
-                              'zip':zip,
-                              'school': schools_to_data[school]['name'],
-                              'school_address': schools_to_data[school]['address'],
-                              'school_start': schools_to_data[school]['start'],
-                              'school_end': schools_to_data[school]['end']
-                            }
+                                'length':geopy.distance.vincenty(start, end).miles,
+                                'zip':zip,
+                                'pickup':ty,
+                                'grade':grade,
+                                'geocode':geocode,
+                                'safety':safety,
+                                'walk':walk,
+                                'school': schools_to_data[school]['name'],
+                                'school_address': schools_to_data[school]['address'],
+                                'school_start': schools_to_data[school]['start'],
+                                'school_end': schools_to_data[school]['end']
+                              }
+                            if type(location['properties']['address']) == str and len(location['properties']['address'].split(" ")) >= 2:
+                                parts = location['properties']['address'].strip().split(" ")
+                                (number, street) = (parts[0], " ".join(parts[1:]))
+                                properties['number'] = number
+                                properties['street'] = street
                             features.append(geojson.Feature(geometry=geometry, properties=properties))
         else:
-            pass #print(zip)
+            pass
     open(file_prefix_students + '.geojson', 'w').write(geojson.dumps(geojson.FeatureCollection(features), indent=2))
     features = list(reversed(sorted(features, key=lambda f: f['properties']['length'])))
     return geojson.FeatureCollection(features)
