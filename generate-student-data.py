@@ -19,42 +19,52 @@ import rtree
 def properties_by_zipcode(file_prefix):
     """
     Build a JSON file grouping all residential properties by zip code
+    and assigning the US Census Bureau Census Block numbers (FIPS codes)
+    to them.
     """
-    features_shapes = [(f, shapely.geometry.shape(f['geometry'])) for f in tqdm(geojson.loads(open('input_data/c_bra_bl.geojson').read())['features']) if f['geometry'] is not None]
+    # Get the (feature, shape) pairs for each census block.
+    block_shapes = [(f, shapely.geometry.shape(f['geometry'])) for f in tqdm(geojson.loads(open('input_data/c_bra_bl.geojson').read())['features']) if f['geometry'] is not None]
 
-    # Build R-tree index for the census block shapes.
+    # Build R-tree index for the census block shapes
+    # to make it easier to find the block closest to
+    # a point.
     rtidx = rtree.index.Index()
-    for i in tqdm(range(len(features_shapes))):
-        (f, s) = features_shapes[i]
+    for i in tqdm(range(len(block_shapes))):
+        (f, s) = block_shapes[i]
         rtidx.insert(i, s.bounds)
 
-    boston_zips = {}
+    # Build the dictionary mapping zip codes to all properties
+    # in that zip code.
     properties = json.load(open(file_prefix + '.geojson', 'r'))
+    boston_zips = {}
     for i in tqdm(properties):
         zipcode = properties[i]['properties']['zipcode']
         address = properties[i]['properties']['address']
         if zipcode != "NULL" and address != "NULL" and properties[i]['properties']['type'] == 'Residential':
-            if zipcode in boston_zips:
-                boston_zips[zipcode][i] = properties[i]
-            else:
-                boston_zips[zipcode] = {}
-                boston_zips[zipcode][i] = properties[i]
+            boston_zips.setdefault(zipcode, {})
+            boston_zips[zipcode][i] = properties[i]
+
+            # Given the location of a property, loop through all nearby
+            # block shapes (according to the R-tree index) and assign
+            # the shape's block code to that property.
             (lat, lon) = properties[i]['geometry']['coordinates']
-            for (f, s) in [features_shapes[i] for i in rtidx.nearest((lon, lat, lon, lat), 1)]:
+            for (f, s) in [block_shapes[i] for i in rtidx.nearest((lon, lat, lon, lat), 1)]:
                 if s.contains(shapely.geometry.Point(lon, lat)):
                     boston_zips[zipcode][i]['geocode'] = f['properties']['CODE']
                     last = (f, s)
                     break
+            # The above could alternatively be implemented via API
+            # calls to the Census Block Conversions API. However,
+            # the service does not use R-tree indices so it's slower.
             #geocode = json.loads(requests.get('http://data.fcc.gov/api/block/find?format=json&latitude=' + str(lat) + '&longitude=' + str(lon) + '&showall=true').text)["Block"]["FIPS"][0:-3]
             #boston_zips[zipcode][i]['geocode'] = geocode
-        else:
-            pass
-    txt = json.dumps(boston_zips, indent=2)
-    open(file_prefix + '-by-zipcode.json', 'w').write(txt)
+
+    open(file_prefix + '-by-zipcode.json', 'w').write(json.dumps(boston_zips, indent=2))
 
 def percentages_csv_to_json(file_prefix):
     """
-    Reads the student-zip-school-percentages or equivalent file and outputs it as a json
+    Reads the student-zip-school-percentages or equivalent file and outputs it
+    as a JSON format file.
     """
     rows = open(file_prefix + '.csv', 'r').read().split("\n")
     fields = rows[0].split("\t")
@@ -70,9 +80,10 @@ def percentages_csv_to_json(file_prefix):
     txt = json.dumps(zip_to_percentages, indent=2)
     open(file_prefix + '.json', 'w').write(txt)
 
-def zip_to_school_to_location(file_prefix, school_names_bps_to_cob = 'input_data/school-names-bps-to-cob', student_zip_school_percentages = 'input_data/student-zip-school-percentages'):
+def zip_to_school_to_location(file_prefix, student_zip_school_percentages = 'input_data/student-zip-school-percentages'):
     """
-    Reads the school csv to construct a json with schools ordered by zipcode with BPS and Cob names plus attendance based on the percentages_csv_to_json output data
+    Reads the school CSV to construct a JSON with schools ordered by zipcode.
+    and extended with attendance information based on the percentages data.
     """
     rows = open(file_prefix + '.csv', 'r').read().split("\n")
     fields = rows[0].split("\t")
@@ -101,7 +112,8 @@ def zip_to_school_to_location(file_prefix, school_names_bps_to_cob = 'input_data
 
 def school_to_bell_time(school_json):
     """
-    Takes the school JSON output from zip_to_school_to_location and assigns bell times.
+    Takes the school JSON output from zip_to_school_to_location and assigns
+    bell times.
     """
     attendance_percents = {'07:30:00':0.0, '08:30:00':0.0, '09:30:00':0.0}
     attendance_thresholds = {'07:30:00':40.0, '08:30:00':40.0, '09:30:00':20.0}
@@ -123,7 +135,9 @@ def school_to_bell_time(school_json):
 
 def students_simulate(file_prefix_properties, file_prefix_percentages, file_prefix_students):
     """
-    Reads the properties_by_zip, student-zip-school-percentages to output the generated data
+    Builds and emits a simulated student data set that randomly assigns
+    a school (and other characteristics) to every student based on
+    appropriate distributions and other criteria.
     """
     neighborhood_safety = json.load(open('input_data/neighborhood-safety.json'))
     grade_safe_distance = json.load(open('input_data/grade-safe-distance.json'))
@@ -189,7 +203,8 @@ def students_simulate(file_prefix_properties, file_prefix_percentages, file_pref
 
 def geojson_to_xlsx(geojson_file, xlsx_file):
     """
-    Converts a JSON file into an XLSX file.
+    Converts a simulated student data set in JSON format into a human-friendly
+    Excel format (with appropriate) changes to field/column names.
     """
     xl_workbook = xlsxwriter.Workbook(xlsx_file)
     xl_bold = xl_workbook.add_format({'bold': True})
