@@ -1,3 +1,9 @@
+"""
+generate-student-data.py
+
+Module for automatically generating a simulated student data set.
+"""
+
 import os
 import requests
 import random
@@ -182,9 +188,9 @@ def students_simulate(file_prefix_properties, file_prefix_percentages, file_pref
     return geojson.FeatureCollection(features)
 
 def geojson_to_xlsx(geojson_file, xlsx_file):
-    '''
+    """
     Converts a JSON file into an XLSX file.
-    '''
+    """
     xl_workbook = xlsxwriter.Workbook(xlsx_file)
     xl_bold = xl_workbook.add_format({'bold': True})
     xl_sheet = xl_workbook.add_worksheet("Student Information")
