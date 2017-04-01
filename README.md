@@ -1,4 +1,4 @@
-# Simulated Student Data Set Generator for Boston Public Schools
+# Simulated Student Data for Boston Public Schools
 Tool for automatically generating simulated data sets of Boston Public Schools students and their school assignments.
 
 ## Usage
