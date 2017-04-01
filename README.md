@@ -3,7 +3,11 @@ Tool for automatically generating simulated data sets of Boston Public Schools s
 
 ## Usage
 
-Install all requirements and execute the script:
+To install all requirements:
+
+   python -m pip install -r requirements.txt
+
+To execute the script and generate a data set:
 
     python generate-student-data.py
 
