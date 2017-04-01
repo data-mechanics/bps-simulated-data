@@ -13,6 +13,8 @@ To execute the script and generate a data set:
 
 ## Example Output
 
+Once the data has been generated, load `visualization.html` in any browser to view a rendering that uses the [Leaflet](http://leafletjs.com/) library.
+
 ![Visualization of generated data using Leaflet](visualization.png)
 
 ## Sources
