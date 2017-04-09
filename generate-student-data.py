@@ -25,39 +25,40 @@ def properties_by_zipcode(file_prefix):
     # Get the (feature, shape) pairs for each census block.
     block_shapes = [(f, shapely.geometry.shape(f['geometry'])) for f in tqdm(geojson.loads(open('input_data/c_bra_bl.geojson').read())['features']) if f['geometry'] is not None]
 
-    # Build R-tree index for the census block shapes
-    # to make it easier to find the block closest to
-    # a point.
+    # Build R-tree index for the census block shapes to make it easier to
+    # find the block closest to a point.
     rtidx = rtree.index.Index()
     for i in tqdm(range(len(block_shapes))):
         (f, s) = block_shapes[i]
         rtidx.insert(i, s.bounds)
 
-    # Build the dictionary mapping zip codes to all properties
-    # in that zip code.
+    # Build dictionary mapping zip code to all properties in that zip.
     properties = json.load(open(file_prefix + '.geojson', 'r'))
     boston_zips = {}
     for i in tqdm(properties):
-        zipcode = properties[i]['properties']['zipcode']
-        address = properties[i]['properties']['address']
-        if zipcode != "NULL" and address != "NULL" and properties[i]['properties']['type'] == 'Residential':
-            boston_zips.setdefault(zipcode, {})
-            boston_zips[zipcode][i] = properties[i]
+        ps = properties[i].get('properties')
+        if ps.get('zipcode') not in ["NULL", None] and\
+           ps.get('address') not in ["NULL", None] and\
+           ps.get('type') == 'Residential':
+            property = properties[i]
 
             # Given the location of a property, loop through all nearby
             # block shapes (according to the R-tree index) and assign
-            # the shape's block code to that property.
-            (lat, lon) = properties[i]['geometry']['coordinates']
+            # the shape's FIPS code to that property.
+            (lat, lon) = property['geometry']['coordinates']
             for (f, s) in [block_shapes[i] for i in rtidx.nearest((lon, lat, lon, lat), 1)]:
                 if s.contains(shapely.geometry.Point(lon, lat)):
-                    boston_zips[zipcode][i]['geocode'] = f['properties']['CODE']
-                    last = (f, s)
+                    property['geocode'] = f['properties']['CODE']
                     break
+
+            boston_zips.setdefault(ps['zipcode'], {})
+            boston_zips[ps['zipcode']][i] = property
+
             # The above could alternatively be implemented via API
             # calls to the Census Block Conversions API. However,
             # the service does not use R-tree indices so it's slower.
             #geocode = json.loads(requests.get('http://data.fcc.gov/api/block/find?format=json&latitude=' + str(lat) + '&longitude=' + str(lon) + '&showall=true').text)["Block"]["FIPS"][0:-3]
-            #boston_zips[zipcode][i]['geocode'] = geocode
+            #boston_zips[ps['zipcode']][i]['geocode'] = geocode
 
     open(file_prefix + '-by-zipcode.json', 'w').write(json.dumps(boston_zips, indent=2))
 
@@ -92,6 +93,7 @@ def zip_to_school_to_location(file_prefix, student_zip_school_percentages = 'inp
 
     # Gets attendance data from student_zip_school_percentages.
     zip_student_percentages = json.loads(open(student_zip_school_percentages + '.json', 'r').read())
+
     # Calculates total number of students in zip_student_percentages.
     total_students = sum([zip_student_percentages[z]['total'] for z in zip_student_percentages])
 
@@ -147,7 +149,9 @@ def students_simulate(file_prefix_properties, file_prefix_percentages, file_pref
     schools_to_data = {school:schools[zip][school] for zip in schools for school in schools[zip]}
     features = []
     for zip in percentages.keys() & props.keys():
-        if zip in schools and len(schools[zip]) > 0:
+        if zip not in schools or len(schools[zip]) == 0:
+            print("No schools found in ZIP Code " + zip + ".")
+        else:
             for (school, fraction) in tqdm(percentages[zip]['schools'].items()):
                 if school in schools_to_data:
                     school_loc = schools_to_data[school]['location']
@@ -179,11 +183,9 @@ def students_simulate(file_prefix_properties, file_prefix_percentages, file_pref
                                 properties = {
                                     'length':geopy.distance.vincenty(start, end).miles,
                                     'zip':zip,
-                                    'pickup':ty,
-                                    'grade':grade,
-                                    'geocode':geocode,
-                                    'safety':safety,
-                                    'walk':grade_safe_distance[grade][safety] if safety is not None else None,
+                                    'pickup':ty, 'grade':grade,
+                                    'geocode':geocode, 'safety':safety,
+                                    'walk':grade_safe_distance[grade].get(safety),
                                     'school': schools_to_data[school]['name'],
                                     'school_address': schools_to_data[school]['address'],
                                     'school_start': schools_to_data[school]['start'],
@@ -195,8 +197,7 @@ def students_simulate(file_prefix_properties, file_prefix_percentages, file_pref
                                     properties['number'] = number
                                     properties['street'] = street.split("#")[0].strip() # No unit numbers.
                                 features.append(geojson.Feature(geometry=geometry, properties=properties))
-        else:
-            pass
+
     open(file_prefix_students + '.geojson', 'w').write(geojson.dumps(geojson.FeatureCollection(features), indent=2))
     features = list(reversed(sorted(features, key=lambda f: f['properties']['length'])))
     return geojson.FeatureCollection(features)
