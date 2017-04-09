@@ -78,8 +78,7 @@ def percentages_csv_to_json(file_prefix):
             'total': int(r[3][1]),
             'schools': dict([(f,float(v)) for (f,v) in r[4:] if float(v) > 0])
           }
-    txt = json.dumps(zip_to_percentages, indent=2)
-    open(file_prefix + '.json', 'w').write(txt)
+    open(file_prefix + '.json', 'w').write(json.dumps(zip_to_percentages, indent=2))
 
 def zip_to_school_to_location(file_prefix, student_zip_school_percentages = 'input_data/student-zip-school-percentages'):
     """
@@ -92,7 +91,7 @@ def zip_to_school_to_location(file_prefix, student_zip_school_percentages = 'inp
     zips = {row['zip'] for row in rows[1:]}
 
     # Gets attendance data from student_zip_school_percentages.
-    zip_student_percentages = json.loads(open(student_zip_school_percentages + '.json', 'r').read())
+    zip_student_percentages = json.load(open(student_zip_school_percentages + '.json', 'r'))
 
     # Calculates total number of students in zip_student_percentages.
     total_students = sum([zip_student_percentages[z]['total'] for z in zip_student_percentages])
@@ -143,8 +142,8 @@ def students_simulate(file_prefix_properties, file_prefix_percentages, file_pref
     """
     neighborhood_safety = json.load(open('input_data/neighborhood-safety.json'))
     grade_safe_distance = json.load(open('input_data/grade-safe-distance.json'))
-    props = json.loads(open(file_prefix_properties + '.json', 'r').read())
-    percentages = json.loads(open(file_prefix_percentages + '.json', 'r').read())
+    props = json.load(open(file_prefix_properties + '.json', 'r'))
+    percentages = json.load(open(file_prefix_percentages + '.json', 'r'))
     schools = zip_to_school_to_location('input_data/schools')
     schools_to_data = {school:schools[zip][school] for zip in schools for school in schools[zip]}
     features = []
@@ -228,7 +227,7 @@ def geojson_to_xlsx(geojson_file, xlsx_file):
         ('School Latitude', lambda f: float(f['geometry']['coordinates'][1][0])),
         ('School Longitude', lambda f: float(f['geometry']['coordinates'][1][1]))
       ]
-    features = json.loads(open(geojson_file).read())['features']
+    features = json.load(open(geojson_file, 'r'))['features']
     for i in range(0, len(columns)):
         xl_sheet.write(0, i, columns[i][0], xl_bold)
     for i in tqdm(range(len(features))):
