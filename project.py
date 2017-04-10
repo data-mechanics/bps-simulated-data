@@ -50,7 +50,7 @@ def rTreeify(points):
 
         return tree, tree_keys
 
-def coordinateDistance(v,w,p):
+def coordinate_distance(v,w,p):
     '''find distance of point to line segment'''
     seglen_squared = (v[0] - w[0])**2 + (v[1] - w[1])**2
     #t = max(0, min(1, dot(p - v, w - v) / l2))
@@ -59,10 +59,10 @@ def coordinateDistance(v,w,p):
     projection = (t*(w[0] - v[0])+v[0],t*(w[1] - v[1])+v[1])
     return ((p[0] - projection[0])**2 + (p[1] - projection[1])**2 )**0.5
 
-def routeTreeIntersection(route,tree,tree_keys,points_dict, r):
-    '''Using route from dictionary and the points tree, return list of keys that are within distance r of the route'''
+def points_linestrings_coverage(linestring,points_tree,points_tree_keys,points_dict, r):
+    '''Using route from dictionary and the points tree, return list of points_tree_keys that are within distance r of the route'''
 
-    multipoint = route['geometry']['coordinates']
+    multipoint = linestring['geometry']['coordinates']
     
     intersecting_points = set()
 
@@ -78,13 +78,13 @@ def routeTreeIntersection(route,tree,tree_keys,points_dict, r):
         y_min = min(yi, yj) - r
         y_max = max(yi, yj) + r
         
-        for i in list(tree.intersection((x_min,y_min,x_max,y_max))):
+        for i in list(points_tree.intersection((x_min,y_min,x_max,y_max))):
             result_set.add(i)
 
         #for each point in the intersecting set, determine if it's within distance r of the line:
         
         for i in result_set:
-            key = tree_keys[str(i)]
+            key = points_tree_keys[str(i)]
             coor = points_dict[key]['geometry']['coordinates']
 
             if optimizeBusStops.coordinateDistance((xi, yi), (xj, yj), (coor[1], coor[0])) <= r:
