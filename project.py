@@ -1,6 +1,9 @@
 import numpy as np
 from sklearn.cluster import KMeans
 from rtree import index
+import pickle
+from tqdm import tqdm
+
 # Want a function that takes as input 
 # set of geojson points, set of geojson linestrings
 
@@ -88,7 +91,7 @@ def points_linestrings_coverage(linestring,points_tree,points_tree_keys,points_d
             key = points_tree_keys[str(i)]
             coor = points_dict[key]['geometry']['coordinates']
 
-            if optimizeBusStops.coordinateDistance((xi, yi), (xj, yj), (coor[1], coor[0])) <= r:
+            if coordinateDistance((xi, yi), (xj, yj), (coor[1], coor[0])) <= r:
                 intersecting_points.add(i)
 
     return intersecting_points
@@ -96,8 +99,6 @@ def points_linestrings_coverage(linestring,points_tree,points_tree_keys,points_d
 # UNFINISHED
 def project_points_to_linestrings(points, linestrings):
     # Todo: Implement rtrees to find line points within certain distance
-    linestrings = linestrings_to_adj_list(linestrings)
-    tree, tree_keys = rTreeify(linestrings.keys())
 
     projections = []
     for p in points:
@@ -116,26 +117,20 @@ def project_points_to_linestrings(points, linestrings):
     return projections
 
 # UNFINISHED
-def generate_student_stops(student_points, numStops=5000):
+def generate_student_stops(student_points, numStops=5000, loadFrom=None):
+    if loadFrom:
+        means = pickle.load(open('kmeans'), 'rb')
+    else:
+        #load student coordinates from students datafile to list of coordinates
+        points = [student_points['features'][i]['geometry']['coordinates'][0] for i in range(len(student_points['features']))]
     
-    #load student coordinates from students datafile to list of coordinates
-    points = [student_points['features'][i]['geometry']['coordinates'][0] for i in range(len(student_points['features']))]
-    
-    #generate means
-    kmeans = KMeans(n_clusters=numStops, random_state=0)
-    means = kmeans.fit(points).cluster_centers_
+        #generate means
+        kmeans = KMeans(n_clusters=numStops, random_state=0)
+        means = kmeans.fit(points).cluster_centers_
+
     means_tree, means_key = rTreeify(means)
     
     #to do: assign each mean to the closest line segment
     #       project mean to the line segment
     #       return projected points 
     project_points_to_linestrings(means, linestrings)
-
-
-
-
-
-
-
-
-
