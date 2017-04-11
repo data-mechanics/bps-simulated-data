@@ -124,9 +124,12 @@ def generate_student_stops(student_points, numStops=5000):
     #generate means
     kmeans = KMeans(n_clusters=numStops, random_state=0)
     means = kmeans.fit(points).cluster_centers_
-    means_dict = rTreeify(means)
+    means_tree, means_key = rTreeify(means)
     
-    project_points_to_linestrings(means_dict, linestrings)
+    #to do: assign each mean to the closest line segment
+    #       project mean to the line segment
+    #       return projected points 
+    project_points_to_linestrings(means, linestrings)
 
 
 
