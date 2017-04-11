@@ -1,5 +1,6 @@
 import numpy as np
 from sklearn.cluster import KMeans
+from rtree import index
 # Want a function that takes as input 
 # set of geojson points, set of geojson linestrings
 
@@ -40,15 +41,15 @@ def linestrings_to_adj_list(linestrings):
         return adj_list
 
 def rTreeify(points):
-        '''take (x,y) pairs and constructs rTree'''
-        tree = index.Index()
-        tree_keys = {}
-        for i, p in enumerate(points):
-            tree_keys[str(i)] = p
-            x, y = p[0], p[1]
-            tree.insert(i,(x,y,x,y))
+    '''take (x,y) pairs and constructs rTree'''
+    tree = index.Index()
+    tree_keys = {}
+    for i, p in enumerate(points):
+        tree_keys[str(i)] = p
+        x, y = p[0], p[1]
+        tree.insert(i,(x,y,x,y))
 
-        return tree, tree_keys
+    return tree, tree_keys
 
 def coordinate_distance(v,w,p):
     '''find distance of point to line segment'''
@@ -116,6 +117,22 @@ def project_points_to_linestrings(points, linestrings):
 
 # UNFINISHED
 def generate_student_stops(student_points, numStops=5000):
+    
+    #load student coordinates from students datafile to list of coordinates
+    points = [student_points['features'][i]['geometry']['coordinates'][0] for i in range(len(student_points['features']))]
+    
+    #generate means
     kmeans = KMeans(n_clusters=numStops, random_state=0)
-    stops = kmeans.fit(student_points).cluster_centers_
-    project_points_to_linestrings(stops, linestrings)
+    means = kmeans.fit(points).cluster_centers_
+    means_dict = rTreeify(means)
+    
+    project_points_to_linestrings(means_dict, linestrings)
+
+
+
+
+
+
+
+
+
