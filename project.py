@@ -3,6 +3,7 @@ from sklearn.cluster import KMeans
 from rtree import index
 import pickle
 from tqdm import tqdm
+import geoql
 
 # Want a function that takes as input 
 # set of geojson points, set of geojson linestrings
@@ -101,15 +102,16 @@ def project_points_to_linestrings(points, linestrings):
     # Todo: Implement rtrees to find line points within certain distance
 
     projections = []
-    for p in points:
+    for p in tqdm(points):
+        linestrings = geoql.features_keep_within_radius(linestrings, p, 0.05, 'miles')
         min_proj = (10000, [0,0])
 
         for lstr in linestrings:
             segments = lstr.geometry.coordinates
             for i in range(len(segments)-1):
-                norm = normal(p1, segments[i], segments[i+1])
+                norm = normal(p, segments[i], segments[i+1])
                 if norm < min_proj[0]:
-                    proj = project(p1, segments[i], segments[i+1])
+                    proj = project(p, segments[i], segments[i+1])
                     min_proj = (norm, proj)
 
         projections.append(min_proj)
@@ -119,7 +121,7 @@ def project_points_to_linestrings(points, linestrings):
 # UNFINISHED
 def generate_student_stops(student_points, numStops=5000, loadFrom=None):
     if loadFrom:
-        means = pickle.load(open('kmeans'), 'rb')
+        means = pickle.load(open(loadFrom, 'rb'))
     else:
         #load student coordinates from students datafile to list of coordinates
         points = [student_points['features'][i]['geometry']['coordinates'][0] for i in range(len(student_points['features']))]
@@ -132,5 +134,7 @@ def generate_student_stops(student_points, numStops=5000, loadFrom=None):
     
     #to do: assign each mean to the closest line segment
     #       project mean to the line segment
-    #       return projected points 
+    #       return projected points
     project_points_to_linestrings(means, linestrings)
+
+generate_student_stops([], loadFrom='kmeans')
