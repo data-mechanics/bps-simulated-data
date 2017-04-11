@@ -3,7 +3,8 @@ from sklearn.cluster import KMeans
 from rtree import index
 import pickle
 from tqdm import tqdm
-import geoql
+import geoql, geojson
+from copy import deepcopy
 
 # Want a function that takes as input 
 # set of geojson points, set of geojson linestrings
@@ -102,11 +103,13 @@ def project_points_to_linestrings(points, linestrings):
     # Todo: Implement rtrees to find line points within certain distance
 
     projections = []
-    for p in tqdm(points):
-        linestrings = geoql.features_keep_within_radius(linestrings, p, 0.05, 'miles')
+    for x,y in tqdm(points[:1]):
+        p = [y, x]
+        lstr_copy = deepcopy(linestrings)
+        lstr_copy = geoql.features_keep_within_radius(lstr_copy, p, 0.5, 'miles')
         min_proj = (10000, [0,0])
 
-        for lstr in linestrings:
+        for lstr in lstr_copy.features:
             segments = lstr.geometry.coordinates
             for i in range(len(segments)-1):
                 norm = normal(p, segments[i], segments[i+1])
@@ -118,7 +121,11 @@ def project_points_to_linestrings(points, linestrings):
 
     return projections
 
-# UNFINISHED
+def load_road_segments(fname):
+    linestrings = geojson.loads(open(fname, 'r').read())
+    linestrings.features = [seg for seg in tqdm(linestrings.features) if seg.type=='Feature']
+    return linestrings
+
 def generate_student_stops(student_points, numStops=5000, loadFrom=None):
     if loadFrom:
         means = pickle.load(open(loadFrom, 'rb'))
@@ -130,11 +137,11 @@ def generate_student_stops(student_points, numStops=5000, loadFrom=None):
         kmeans = KMeans(n_clusters=numStops, random_state=0)
         means = kmeans.fit(points).cluster_centers_
 
-    means_tree, means_key = rTreeify(means)
-    
     #to do: assign each mean to the closest line segment
     #       project mean to the line segment
     #       return projected points
-    project_points_to_linestrings(means, linestrings)
+    linestrings = load_road_segments('example_extract_missing.geojson')
+    #return means, linestrings
+    return project_points_to_linestrings(means, linestrings)
 
-generate_student_stops([], loadFrom='kmeans')
+stops = generate_student_stops([], loadFrom='kmeans')
