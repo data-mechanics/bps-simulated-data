@@ -20,7 +20,8 @@ def project(p1, l1, l2):
 
     line = l2 - l1
     vec = p1 - l1
-    return vec.dot(line) / (line.dot(line) * line)  # Projects vec onto line
+    #print(l1, l2, vec, line, line.dot(line), flush=True)
+    return (vec.dot(line) / line.dot(line)) * line  # Projects vec onto line
 
 def normal(p1, l1, l2):
     p1 = np.array(p1)
@@ -30,6 +31,19 @@ def normal(p1, l1, l2):
     proj = project(p1, l1, l2)
     norm = l1 + proj - p1
     return norm.dot(norm)
+
+def project_point_to_segment(p1, l1, l2):
+    p1 = np.array(p1)
+    l1 = np.array(l1)
+    l2 = np.array(l2)
+
+    proj = project(p1, l1, l2)
+
+    # x on segment
+    if (proj-l1).dot(proj-l2) <= 0:
+        return x
+    else: # x not on segment
+        return min(p1-l1, p1-l2)
 
 def linestrings_to_adj_list(linestrings):
     '''converts a list of linestrings into an adjacency list of edges'''
@@ -103,23 +117,25 @@ def project_points_to_linestrings(points, linestrings):
     # Todo: Implement rtrees to find line points within certain distance
 
     projections = []
-    for x,y in tqdm(points[:1]):
+    for x,y in tqdm(points):
         p = [y, x]
         lstr_copy = deepcopy(linestrings)
         lstr_copy = geoql.features_keep_within_radius(lstr_copy, p, 0.5, 'miles')
         min_proj = (10000, [0,0])
-
         for lstr in lstr_copy.features:
             segments = lstr.geometry.coordinates
             for i in range(len(segments)-1):
+                #if np.linalg.norm(np.array(segments[i+1]) - np.array(segments[i])) == 0:
+
                 norm = normal(p, segments[i], segments[i+1])
+                          
                 if norm < min_proj[0]:
-                    proj = project(p, segments[i], segments[i+1])
-                    min_proj = (norm, proj)
+                        proj = project(p, segments[i], segments[i+1])
+                        min_proj = (norm, proj)
 
         projections.append(min_proj)
 
-    return projections
+    return [list(p[1]) for p in projections]
 
 def load_road_segments(fname):
     linestrings = geojson.loads(open(fname, 'r').read())
@@ -147,5 +163,7 @@ def generate_student_stops(student_points, numStops=5000, loadFrom=None):
     return project_points_to_linestrings(means, linestrings)
 
 stops = generate_student_stops([], loadFrom='kmeans')
-
+with open('stops', 'wb') as f:
+    f.write(pickle.dumps(stops))
+#with open('student_stops', '')
 
