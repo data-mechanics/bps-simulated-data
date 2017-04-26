@@ -83,7 +83,7 @@ def project_points_to_linestrings(points, linestrings):
     projections = []
     tree, tree_keys = rTreeify(linestrings)
 
-    for lat,lon in tqdm(points[9:11]):
+    for lat,lon in tqdm(points):
         p = np.array([lat, lon])
         lstr_copy = deepcopy(linestrings)
         lstr_copy = find_intersection(lstr_copy, tree, tree_keys, p, 0.01)
@@ -123,17 +123,18 @@ def generate_student_stops(student_points, numStops=5000, loadFrom=None):
         means = kmeans.fit(points).cluster_centers_
 
     # get linestrings from roadsegments
-    linestrings = load_road_segments('example_extract_missing.geojson')
-
+    linestrings = load_road_segments('input_data/example_extract_missing.geojson')
+    
     #return means, linestrings
     return means, project_points_to_linestrings(means, linestrings)
 
 import time
 start = time.time()
-points, stops = generate_student_stops([], loadFrom='kmeans')
+points, stops = generate_student_stops([], loadFrom='input_data/kmeans')
 end = time.time()
-with open('timelog', 'w') as f:
+
+with open('output/timelog', 'w') as f:
     f.write(str(end-start))
 
-with open('stops', 'wb') as f:
+with open('output/stops', 'wb') as f:
     f.write(pickle.dumps(stops))
