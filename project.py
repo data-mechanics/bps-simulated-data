@@ -48,40 +48,46 @@ def project_point_to_segment(p1, l1, l2):
     else: # distance from point to l2 is smaller
         return l2
 
-def linestrings_to_adj_list(linestrings):
-    '''converts a list of linestrings into an adjacency list of edges'''
-    for lstr in linestrings:
-        segments = lstr.geometry.coordinates
-        adj_list = {}
-        for i in range(len(segments)-1):
-            v1, v2 = segments[i], segments[i+1]
-            adj_list.set_default(v1, [])
-            adj_list.set_default(v2, [])
-            adj_list[v1].append(v2)
-            adj_list[v2].append(v1)
-
-        return adj_list
-
-def rTreeify(points):
-    '''take (x,y) pairs and constructs rTree'''
+def rTreeify(obj):
+    '''takes geojson FeatureCollection of linestrings and constructs rTree'''
     tree = index.Index()
     tree_keys = {}
-    for i, p in enumerate(points):
-        tree_keys[str(i)] = p
-        x, y = p[0], p[1]
-        tree.insert(i,(x,y,x,y))
+    i = 0
+    for j, lstr in enumerate(obj.features):
+        for p in lstr.geometry.coordinates:
+            tree_keys[str(i)] = j
+            x, y = p[0], p[1]
+            tree.insert(i,(x,y,x,y))
+            i += 1
 
     return tree, tree_keys
+
+def find_intersection(obj, tree, tree_keys, p, r):
+    ''' Finds all points in the rtree tree in the bounding box centered on p with
+        radius r '''
+    lat, lon = p
+    result = set()
+    for i in tqdm(list(tree.intersection((lat-r, lon-r, lat+r, lon+r)))):
+        result.add(tree_keys[str(i)])
+
+    result = list(result)
+    result.sort()
+    obj.features = [obj.features[j] for j in result]
+
+    return obj
 
 # UNFINISHED
 def project_points_to_linestrings(points, linestrings):
     # Todo: Implement rtrees to find line points within certain distance
 
     projections = []
-    for x,y in tqdm(points):
-        p = np.array([x, y])
+    tree, tree_keys = rTreeify(linestrings)
+
+    for lat,lon in tqdm(points[9:11]):
+        p = np.array([lat, lon])
         lstr_copy = deepcopy(linestrings)
-        lstr_copy = geoql.features_keep_within_radius(lstr_copy, [y,x], 0.5, 'miles')
+        lstr_copy = find_intersection(lstr_copy, tree, tree_keys, p, 0.01)
+        lstr_copy = geoql.features_keep_within_radius(lstr_copy, [lon,lat], 0.5, 'miles')
         min_proj = (10000, [0,0])
         for lstr in lstr_copy.features:
             segments = lstr.geometry.coordinates
@@ -92,10 +98,10 @@ def project_points_to_linestrings(points, linestrings):
                 dist = norm.dot(norm)
                 if dist < min_proj[0]:
                     proj = project_point_to_segment(p, segments[i], segments[i+1])
-                    min_proj = [dist, proj]
+                    min_proj = [dist, proj, np.array(segments[i]), np.array(segments[i+1])]
         projections.append(min_proj)
 
-    return [p[1] for p in projections]
+    return [p[1:] for p in projections]
 
 def load_road_segments(fname):
     linestrings = geojson.loads(open(fname, 'r').read())
@@ -122,6 +128,12 @@ def generate_student_stops(student_points, numStops=5000, loadFrom=None):
     #return means, linestrings
     return means, project_points_to_linestrings(means, linestrings)
 
+import time
+start = time.time()
 points, stops = generate_student_stops([], loadFrom='kmeans')
+end = time.time()
+with open('timelog', 'w') as f:
+    f.write(str(end-start))
+
 with open('stops', 'wb') as f:
     f.write(pickle.dumps(stops))
