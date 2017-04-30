@@ -132,31 +132,57 @@ def find_connected_segment_indices(obj):
     obj.features = [obj.features[i] for i in indices]
     return obj
 
-def generate_student_stops(student_points, numStops=5000, loadFrom=None):
+def generate_student_stops(student_features, numStops=5000, loadFrom=None):
+    # We assume that the order of stops will not change at any point
 
-    # get means from picle or generate
+    # We don't want to do anything to d2d stops
+    d2d_stops = [f['geometry']['coordinates'][0]
+       for f in student_features['features']
+       if f['properties']['pickup'] == 'd2d']
+
+    # get means from pickle or generate
     if loadFrom:
-        means = pickle.load(open(loadFrom, 'rb'))
-
+        k_fit = pickle.load(open(loadFrom, 'rb'))
+        corner_stops = k_fit['corner_stops']
+        labels = k_fit['labels']
     else:
         # load student coordinates from students datafile to list of coordinates
-        points = [student_points['features'][i]['geometry']['coordinates'][0] for i in range(len(student_points['features']))]
+        corner_students = [feature['geometry']['coordinates'][0]
+                  for feature in student_features['features']
+                  if feature['properties']['pickup'] == 'corner']
     
-        #generate means
+        #generate means for corner students
         kmeans = KMeans(n_clusters=numStops, random_state=0)
-        means = kmeans.fit(points).cluster_centers_
+        k_fit = kmeans.fit(corner_students)
+        corner_stops = k_fit.cluster_centers_
+        labels = k_fit.labels_
+
+        # Write kmeans results to a file
+        with open('kmeans', 'w') as f:
+            f.write(pickle.dumps({'means': means, 'corner_stops': labels}))
 
     # get linestrings from roadsegments
     linestrings = load_road_segments('input_data/example_extract_missing.geojson')
     linestrings = find_connected_segment_indices(linestrings)
     
-    #return means, linestrings
-    return means, project_points_to_linestrings(means, linestrings)
+    projected_corner_stops = project_points_to_linestrings(corner_stops, linestrings)
+
+    all_stops = []
+    for feature in range(student_features['features']):
+        if feature['properties']['pickup'] == 'd2d':
+            all_stops.append(d2d_stops)
+        else: # pickup type is corner student
+            all_stops.append(projected_corner_stops)
+
+    return all_stops
 
 def run():
     import time
+    
+    student_features = geojson.loads(open('input_data/students.geojson', 'r').read())
+
     start = time.time()
-    points, stops = generate_student_stops([], loadFrom='input_data/kmeans')
+    stops = generate_student_stops(student_features)#, loadFrom='input_data/kmeans')
     end = time.time()
 
     with open('output/timelog', 'w') as f:
