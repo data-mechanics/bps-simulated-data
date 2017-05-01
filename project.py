@@ -136,9 +136,14 @@ def generate_student_stops(student_features, numStops=5000, loadFrom=None):
     # We assume that the order of stops will not change at any point
 
     # We don't want to do anything to d2d stops
-    d2d_stops = [f['geometry']['coordinates'][0]
-       for f in student_features['features']
-       if f['properties']['pickup'] == 'd2d']
+    #d2d_stops = [f['geometry']['coordinates'][0]
+    #   for f in student_features['features']
+    #   if f['properties']['pickup'] == 'd2d']
+    d2d_stops = [f for f in student_features['features'] if f['properties']['pickup'] == 'd2d']
+    # load student coordinates from students datafile to list of coordinates
+    corner_students = [feature['geometry']['coordinates'][0]
+               for feature in student_features['features']
+               if feature['properties']['pickup'] == 'corner']
 
     # get means from pickle or generate
     if loadFrom:
@@ -146,53 +151,82 @@ def generate_student_stops(student_features, numStops=5000, loadFrom=None):
         corner_stops = k_fit['corner_stops']
         labels = k_fit['labels']
     else:
-        # load student coordinates from students datafile to list of coordinates
-        corner_students = [feature['geometry']['coordinates'][0]
-                  for feature in student_features['features']
-                  if feature['properties']['pickup'] == 'corner']
-    
         #generate means for corner students
-        kmeans = KMeans(n_clusters=numStops, random_state=0)
+        kmeans = KMeans(n_clusters=numStops-len(d2d_stops), random_state=0)
         k_fit = kmeans.fit(corner_students)
         corner_stops = k_fit.cluster_centers_
         labels = k_fit.labels_
 
         # Write kmeans results to a file
-        with open('kmeans', 'w') as f:
-            f.write(pickle.dumps({'means': means, 'corner_stops': labels}))
+        with open('input_data/kmeans', 'wb') as f:
+            f.write(pickle.dumps({'corner_stops': corner_stops, 'labels': labels}))
+
+        print('Kmeans written', flush=True)
 
     # get linestrings from roadsegments
     linestrings = load_road_segments('input_data/example_extract_missing.geojson')
     linestrings = find_connected_segment_indices(linestrings)
     
     projected_corner_stops = project_points_to_linestrings(corner_stops, linestrings)
+   
+    return list(d2d_stops), list(projected_corner_stops)
 
-    all_stops = []
-    for feature in range(student_features['features']):
-        if feature['properties']['pickup'] == 'd2d':
-            all_stops.append(d2d_stops)
-        else: # pickup type is corner student
-            all_stops.append(projected_corner_stops)
+def seperate_stops_by_school(stops, students, labels) :
+    # Create a duplicate stop for every student going to the same school
+    schools_per_stop = {stop:set() for stop in range(len(stops['features']))}
+    new_features = []
 
-    return all_stops
+    for i in range(len(labels)):
+        school = students[i]['properties']['school']
+        school_coords = students[i]['geometry']['coordinates'][1]
+        schools_per_stop[labels[i]].add((school, tuple(school_coords)))
 
-def run():
-    import time
-    
-    student_features = geojson.loads(open('input_data/students.geojson', 'r').read())
+    for stop_idx in schools_per_stop: 
+        for school, school_coords in schools_per_stop[stop_idx]:
+            feature = deepcopy(stops['features'][stop_idx])
+            feature['geometry']['coordinates'][1] = school_coords
+            feature['properties']['school'] = school
+            new_features.append(feature)
+    stops.features = new_features
+    return stops
 
-    start = time.time()
-    stops = generate_student_stops(student_features)#, loadFrom='input_data/kmeans')
-    end = time.time()
+corner = pickle.loads(open('corner', 'rb').read())
+students = geojson.loads(open('input_data/students.geojson', 'rb').read())
+students = [f for f in students['features'] if f['properties']['pickup'] == 'corner']
+labels = pickle.loads(open('input_data/kmeans', 'rb').read())['labels']
 
-    with open('output/timelog', 'w') as f:
-        f.write(str(end-start))
+features = []
 
-    with open('output/stops', 'wb') as f:
-        f.write(pickle.dumps(stops))
+for stop in corner:
+    p, l1, l2 = stop
+    # -1 is a placeholder value
+    feature = geojson.Feature(geometry=geojson.LineString([p, (-1,-1)]), properties={'projection':[l1, l2]})
+    features.append(feature)
+
+stops = geojson.feature.FeatureCollection(features)
+stops = seperate_stops_by_school(stops, students, labels)
+
+with open('corner', 'wb') as f:
+    f.write(pickle.dumps(stops))
+
+'''
+import time
+   
+student_features = geojson.loads(open('input_data/students.geojson', 'r').read())
+
+start = time.time()
+d2d, corner = generate_student_stops(student_features, loadFrom='input_data/kmeans')
+end = time.time()
+
+all_stops = seperate_stops_by_school(stops, students, labels)
+
+with open('output/timelog', 'w') as f:
+    f.write(str(end-start))
+'''
+#with open('output/stops', 'wb') as f:
+#    f.write(pickle.dumps(stops))
 
 #run()
-
 
 
 
