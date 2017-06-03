@@ -158,13 +158,13 @@ def generate_student_stops(student_features, numStops=5000, loadFrom=None):
         labels = k_fit.labels_
 
         # Write kmeans results to a file
-        with open('input_data/kmeans', 'wb') as f:
+        with open('output/kmeans', 'wb') as f:
             f.write(pickle.dumps({'corner_stops': corner_stops, 'labels': labels}))
 
         print('Kmeans written', flush=True)
 
     # get linestrings from roadsegments
-    linestrings = load_road_segments('input_data/example_extract_missing.geojson')
+    linestrings = load_road_segments('input/road-network-extract-missing.geojson')
     linestrings = find_connected_segment_indices(linestrings)
     
     projected_corner_stops = project_points_to_linestrings(corner_stops, linestrings)
@@ -191,9 +191,9 @@ def seperate_stops_by_school(stops, students, labels) :
     return stops
 
 corner = pickle.loads(open('corner', 'rb').read())
-students = geojson.loads(open('input_data/students.geojson', 'rb').read())
+students = geojson.loads(open('output/students.geojson', 'rb').read())
 students = [f for f in students['features'] if f['properties']['pickup'] == 'corner']
-labels = pickle.loads(open('input_data/kmeans', 'rb').read())['labels']
+labels = pickle.loads(open('output/kmeans', 'rb').read())['labels']
 
 features = []
 
@@ -212,10 +212,10 @@ with open('corner', 'wb') as f:
 '''
 import time
    
-student_features = geojson.loads(open('input_data/students.geojson', 'r').read())
+student_features = geojson.loads(open('output/students.geojson', 'r').read())
 
 start = time.time()
-d2d, corner = generate_student_stops(student_features, loadFrom='input_data/kmeans')
+d2d, corner = generate_student_stops(student_features, loadFrom='output/kmeans')
 end = time.time()
 
 all_stops = seperate_stops_by_school(stops, students, labels)
