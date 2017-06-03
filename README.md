@@ -1,5 +1,5 @@
 # Simulated Student Data for Boston Public Schools
-Tool for automatically generating simulated data sets of Boston Public Schools students and their school assignments.
+Tool for automatically generating simulated data sets of Boston Public Schools students, their school assignments, their bus stop assignments, and bus routes.
 
 ## Usage
 
@@ -7,9 +7,15 @@ To install all requirements:
 
     python -m pip install --upgrade --no-cache-dir -r requirements.txt
 
-To execute the script and generate a data set:
+To execute the script and generate individual data sets (placed in the `output` subdirectory by default):
 
     python generate-student-data.py
+    python generate-bus-data.py
+    python generate-stop-data.py
+
+To generate a compiled Excel workbook (appropriate for submission to the [bps-challenge-score scoring tool](https://github.com/Data-Mechanics/bps-challenge-score):
+
+    python generate-compiled-data.py
 
 ## Example Output
 
