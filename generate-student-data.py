@@ -65,7 +65,7 @@ def properties_by_zipcode(file_properties, file_census_blocks, file_output):
             #boston_zips[ps['zipcode']][i]['geocode'] = geocode
 
     # Emit the file mapping each zip code to all properties in that zip code.
-    open(file_output, 'w').write(json.dumps(boston_zips, indent=2))
+    open(file_output, 'w').write(json.dumps(boston_zips, indent=2, sort_keys=True))
 
 def percentages_csv_to_json(file_csv, file_json):
     """
