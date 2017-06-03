@@ -12,30 +12,34 @@ import json
 import geojson
 import geopy.distance
 import shapely.geometry
-from tqdm import tqdm
 import xlsxwriter
 import rtree
+from tqdm import tqdm
 
-def properties_by_zipcode(file_prefix):
+def properties_by_zipcode(file_properties, file_census_blocks, file_output):
     """
     Build a JSON file grouping all residential properties by zip code
     and assigning the US Census Bureau Census Block numbers (FIPS codes)
     to them.
     """
     # Get the (feature, shape) pairs for each census block.
-    block_shapes = [(f, shapely.geometry.shape(f['geometry'])) for f in tqdm(geojson.loads(open('input_data/c_bra_bl.geojson').read())['features']) if f['geometry'] is not None]
+    block_shapes = [
+        (f, shapely.geometry.shape(f['geometry'])) 
+        for f in tqdm(geojson.loads(open(file_census_blocks).read())['features'], desc='Building census block shape list') 
+        if f['geometry'] is not None
+      ]
 
     # Build R-tree index for the census block shapes to make it easier to
     # find the block closest to a point.
     rtidx = rtree.index.Index()
-    for i in tqdm(range(len(block_shapes))):
+    for i in tqdm(range(len(block_shapes)), desc='Building R-tree of census blocks'):
         (f, s) = block_shapes[i]
         rtidx.insert(i, s.bounds)
 
-    # Build dictionary mapping zip code to all properties in that zip.
-    properties = json.load(open(file_prefix + '.geojson', 'r'))
+    # Build dictionary mapping each zip code to all properties in that zip.
+    properties = json.load(open(file_properties, 'r'))
     boston_zips = {}
-    for i in tqdm(properties):
+    for i in tqdm(properties, desc='Building zip-to-property dictionary'):
         ps = properties[i].get('properties')
         if ps.get('zipcode') not in ["NULL", None] and\
            ps.get('address') not in ["NULL", None] and\
@@ -60,16 +64,17 @@ def properties_by_zipcode(file_prefix):
             #geocode = json.loads(requests.get('http://data.fcc.gov/api/block/find?format=json&latitude=' + str(lat) + '&longitude=' + str(lon) + '&showall=true').text)["Block"]["FIPS"][0:-3]
             #boston_zips[ps['zipcode']][i]['geocode'] = geocode
 
-    open(file_prefix + '-by-zipcode.json', 'w').write(json.dumps(boston_zips, indent=2))
+    # Emit the file mapping each zip code to all properties in that zip code.
+    open(file_output, 'w').write(json.dumps(boston_zips, indent=2))
 
-def percentages_csv_to_json(file_prefix):
+def percentages_csv_to_json(file_csv, file_json):
     """
     Reads the student-zip-school-percentages or equivalent file and outputs it
     as a JSON format file.
     """
-    rows = open(file_prefix + '.csv', 'r').read().split("\n")
+    rows = open(file_csv, 'r').read().split("\n")
     fields = rows[0].split("\t")
-    rows = [list(zip(fields, row.split("\t"))) for row in tqdm(rows[1:])]
+    rows = [list(zip(fields, row.split("\t"))) for row in rows[1:]]
     zip_to_percentages = {}
     for r in rows:
         zip_to_percentages[r[0][1]] = {
@@ -78,20 +83,20 @@ def percentages_csv_to_json(file_prefix):
             'total': int(r[3][1]),
             'schools': dict([(f,float(v)) for (f,v) in r[4:] if float(v) > 0])
           }
-    open(file_prefix + '.json', 'w').write(json.dumps(zip_to_percentages, indent=2))
+    open(file_json, 'w').write(json.dumps(zip_to_percentages, indent=2))
 
-def zip_to_school_to_location(file_prefix, student_zip_school_percentages = 'input_data/student-zip-school-percentages'):
+def zip_to_school_to_location(file_schools, file_student_zip_school_percentages):
     """
     Reads the school CSV to construct a JSON with schools ordered by zipcode.
     and extended with attendance information based on the percentages data.
     """
-    rows = open(file_prefix + '.csv', 'r').read().split("\n")
+    rows = open(file_schools, 'r').read().split("\n")
     fields = rows[0].split("\t")
     rows = [dict(zip(fields, row.split("\t"))) for row in rows[1:]]
     zips = {row['zip'] for row in rows[1:]}
 
     # Gets attendance data from student_zip_school_percentages.
-    zip_student_percentages = json.load(open(student_zip_school_percentages + '.json', 'r'))
+    zip_student_percentages = json.load(open(file_student_zip_school_percentages, 'r'))
 
     # Calculates total number of students in zip_student_percentages.
     total_students = sum([zip_student_percentages[z]['total'] for z in zip_student_percentages])
@@ -134,24 +139,24 @@ def school_to_bell_time(school_json):
                     break
     return school_json
 
-def students_simulate(file_prefix_properties, file_prefix_percentages, file_prefix_students):
+def students_simulate(file_schools, file_properties_by_zipcode, file_neighborhood_safety, file_grade_safe_distance, file_student_zip_school_percentages, file_students):
     """
     Builds and emits a simulated student data set that randomly assigns
     a school (and other characteristics) to every student based on
     appropriate distributions and other criteria.
     """
-    neighborhood_safety = json.load(open('input_data/neighborhood-safety.json'))
-    grade_safe_distance = json.load(open('input_data/grade-safe-distance.json'))
-    props = json.load(open(file_prefix_properties + '.json', 'r'))
-    percentages = json.load(open(file_prefix_percentages + '.json', 'r'))
-    schools = zip_to_school_to_location('input_data/schools')
+    neighborhood_safety = json.load(open(file_neighborhood_safety))
+    grade_safe_distance = json.load(open(file_grade_safe_distance))
+    props = json.load(open(file_properties_by_zipcode, 'r'))
+    percentages = json.load(open(file_student_zip_school_percentages, 'r'))
+    schools = zip_to_school_to_location(file_schools, file_student_zip_school_percentages)
     schools_to_data = {school:schools[zip][school] for zip in schools for school in schools[zip]}
     features = []
     for zip in percentages.keys() & props.keys():
         if zip not in schools or len(schools[zip]) == 0:
             print("No schools found in ZIP Code " + zip + ".")
         else:
-            for (school, fraction) in tqdm(percentages[zip]['schools'].items()):
+            for (school, fraction) in tqdm(percentages[zip]['schools'].items(), desc='Processing ZIP ' + zip):
                 if school in schools_to_data:
                     school_loc = schools_to_data[school]['location']
                     for ty in ['corner', 'd2d']:
@@ -197,7 +202,7 @@ def students_simulate(file_prefix_properties, file_prefix_percentages, file_pref
                                     properties['street'] = street.split("#")[0].strip() # No unit numbers.
                                 features.append(geojson.Feature(geometry=geometry, properties=properties))
 
-    open(file_prefix_students + '.geojson', 'w').write(geojson.dumps(geojson.FeatureCollection(features), indent=2))
+    open(file_students, 'w').write(geojson.dumps(geojson.FeatureCollection(features), indent=2))
     features = list(reversed(sorted(features, key=lambda f: f['properties']['length'])))
     return geojson.FeatureCollection(features)
 
@@ -230,17 +235,28 @@ def geojson_to_xlsx(geojson_file, xlsx_file):
     features = json.load(open(geojson_file, 'r'))['features']
     for i in range(0, len(columns)):
         xl_sheet.write(0, i, columns[i][0], xl_bold)
-    for i in tqdm(range(len(features))):
+    for i in tqdm(range(len(features)), desc="Converting GeoJSON features to XLSX rows"):
         for j in range(0,len(columns)):
             xl_sheet.write(i+1, j, columns[j][1](features[i]))
     xl_workbook.close()
 
 def main():
-    properties_by_zipcode('input_data/properties')
-    percentages_csv_to_json('input_data/student-zip-school-percentages')
-    students = students_simulate('input_data/properties-by-zipcode', 'input_data/student-zip-school-percentages', 'students')
+    # Set the random seed to ensure determinism.
+    random.seed(1)
+
+    properties_by_zipcode('input/properties.geojson', 'input/census-blocks.geojson', 'input/properties-by-zipcode.json')
+    percentages_csv_to_json('input/student-zip-school-percentages.csv', 'input/student-zip-school-percentages.json')
+    students =\
+      students_simulate(
+          'input/schools.csv',
+          'input/properties-by-zipcode.json',
+          'input/neighborhood-safety.json',
+          'input/grade-safe-distance.json',
+          'input/student-zip-school-percentages.json',
+          'output/students.geojson'
+        )
     open('visualization.js', 'w').write('var obj = ' + geojson.dumps(students) + ';')
-    geojson_to_xlsx('students.geojson', 'students.xlsx')
+    geojson_to_xlsx('output/students.geojson', 'output/students.xlsx')
 
 main()
 
