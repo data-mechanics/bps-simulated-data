@@ -255,7 +255,7 @@ def main():
           'input/student-zip-school-percentages.json',
           'output/students.geojson'
         )
-    open('visualization.js', 'w').write('var obj = ' + geojson.dumps(students) + ';')
+    open('output/visualization.js', 'w').write('var obj = ' + geojson.dumps(students) + ';')
     geojson_to_xlsx('output/students.geojson', 'output/students.xlsx')
 
 main()
