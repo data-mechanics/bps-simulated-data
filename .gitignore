@@ -2,9 +2,7 @@
 .DS_Store
 .Rhistory
 
+# Python files.
+__pycache__
+
 # Generated files.
-students.geojson
-student-zip-school-percentages.json
-students.xlsx
-visualization.js
-input_data/properties-by-zipcode.json

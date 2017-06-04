@@ -9,4 +9,5 @@ xlrd
 xlsxwriter
 rtree
 numpy
+networkx
 tqdm
