@@ -4,7 +4,6 @@ generate-student-data.py
 Module for automatically generating a simulated student data set.
 """
 
-import os
 import requests
 import random
 import math
@@ -152,11 +151,14 @@ def students_simulate(file_schools, file_properties_by_zipcode, file_neighborhoo
     schools = zip_to_school_to_location(file_schools, file_student_zip_school_percentages)
     schools_to_data = {school:schools[zip][school] for zip in schools for school in schools[zip]}
     features = []
-    for zip in percentages.keys() & props.keys():
+    zips = list(percentages.keys() & props.keys())
+    for i in range(len(zips)):
+        zip = zips[i]
+        progress = " (" + str(i+1) + "/" + str(len(zips)) + ")"
         if zip not in schools or len(schools[zip]) == 0:
-            print("No schools found in ZIP Code " + zip + ".")
+            print("No schools found in ZIP Code " + zip + progress + ".")
         else:
-            for (school, fraction) in tqdm(percentages[zip]['schools'].items(), desc='Processing ZIP ' + zip):
+            for (school, fraction) in tqdm(percentages[zip]['schools'].items(), desc='Processing ZIP ' + zip + progress):
                 if school in schools_to_data:
                     school_loc = schools_to_data[school]['location']
                     for ty in ['corner', 'd2d']:
@@ -240,7 +242,7 @@ def geojson_to_xlsx(geojson_file, xlsx_file):
             xl_sheet.write(i+1, j, columns[j][1](features[i]))
     xl_workbook.close()
 
-def main():
+if __name__ == "__main__":
     # Set the random seed to ensure determinism.
     random.seed(1)
 
@@ -257,7 +259,5 @@ def main():
         )
     open('output/visualization.js', 'w').write('var obj = ' + geojson.dumps(students) + ';')
     geojson_to_xlsx('output/students.geojson', 'output/students.xlsx')
-
-main()
 
 ## eof
