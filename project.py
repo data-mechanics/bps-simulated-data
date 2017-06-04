@@ -1,11 +1,17 @@
-import numpy as np
-from sklearn.cluster import KMeans
-from rtree import index
-import pickle
-from tqdm import tqdm
-import geoql, geojson
+
 from copy import deepcopy
-import networkx as nx
+import geojson
+import geopy.distance
+import shapely.geometry
+from geoql import geoql
+import geoleaflet
+import xlsxwriter
+import rtree
+import pickle
+import numpy as np
+import networkx
+from sklearn.cluster import KMeans
+from tqdm import tqdm
 
 # Want a function that takes as input 
 # set of geojson points, set of geojson linestrings
@@ -13,55 +19,48 @@ import networkx as nx
 # points is a list of (x, y) coordinates
 # linestrings is a list of geojson linestrings representing streets
 
-def project(p1, l1, l2):
-    # find projection of p1 onto line between l1 and l2
-    p1 = np.array(p1)
-    l1 = np.array(l1)
-    l2 = np.array(l2)
+def project(x, v, w):
+    '''
+    Compute projection of x onto line between v and w.
+    '''
+    (x, v, w) = (np.array(x), np.array(v), np.array(w))
+    d = w - v
+    u = x - v
+    return v + (u.dot(d) / d.dot(d)) * d
 
-    line = l2 - l1
-    vec = p1 - l1
-    #print(l1, l2, vec, line, line.dot(line), flush=True)
-    return l1 + (vec.dot(line) / line.dot(line)) * line  # Projects vec onto line
+def project_point_onto_segment(x, v, w):
+    (x, v, w) = (np.array(x), np.array(v), np.array(w)) 
+    p = project(x, v, w)
+    pv = p - v
+    pw = p - w
 
-def normal(p1, l1, l2):
-    p1 = np.array(p1)
-    l1 = np.array(l1)
-    l2 = np.array(l2)
+    # The vectors pv and pw face in opposite directions if the dot product is negative.
+    if pv.dot(pw) <= 0:
+        return p
+    elif np.dot(pv, pv) <= np.dot(pw, pw): # The point p is not on the segment.
+        return v
+    else: # Distance from the point to w is smaller.
+        return w
 
-    proj = project_point_to_segment(p1, l1, l2)
-    return proj - p1
+def normal(x, v, w):
+    (x, v, w) = (np.array(x), np.array(v), np.array(w))
+    return project_point_onto_segment(x, v, w) - x
 
-def project_point_to_segment(p1, l1, l2):
-    p1 = np.array(p1)
-    l1 = np.array(l1)
-    l2 = np.array(l2)
-
-    proj = project(p1, l1, l2)
-    v1 = proj - l1
-    v2 = proj - l2
-
-    # v1 and v2 face in opposite directions if the dot product is negative 
-    if v1.dot(v2) <= 0:
-        return proj
-    elif np.dot(v1, v1) <= np.dot(v2, v2): # proj not on segment
-        return l1
-    else: # distance from point to l2 is smaller
-        return l2
-
-def rTreeify(obj):
-    '''takes geojson FeatureCollection of linestrings and constructs rTree'''
-    tree = index.Index()
+def features_to_rtree(obj):
+    '''
+    Takes GeoJSON FeatureCollection of LineString entries and constructs
+    a corresponding R-tree.
+    '''
+    tree = rtree.index.Index()
     tree_keys = {}
     i = 0
-    for j, lstr in enumerate(obj.features):
+    for (j, lstr) in enumerate(obj.features):
         for p in lstr.geometry.coordinates:
             tree_keys[str(i)] = j
-            x, y = p[0], p[1]
-            tree.insert(i,(x,y,x,y))
+            (x, y) = (p[0], p[1])
+            tree.insert(i, (x, y, x, y))
             i += 1
-
-    return tree, tree_keys
+    return (tree, tree_keys)
 
 def find_intersection(obj, tree, tree_keys, p, r):
     ''' Finds all points in the rtree tree in the bounding box centered on p with
@@ -70,21 +69,17 @@ def find_intersection(obj, tree, tree_keys, p, r):
     result = set()
     for i in tqdm(list(tree.intersection((lat-r, lon-r, lat+r, lon+r)))):
         result.add(tree_keys[str(i)])
-
     result = list(result)
     result.sort()
     obj.features = [obj.features[j] for j in result]
-
     return obj
 
 # UNFINISHED
 def project_points_to_linestrings(points, linestrings):
-    # Todo: Implement rtrees to find line points within certain distance
-
+    # Todo: Implement rtrees to find line points within certain distance.
     projections = []
-    tree, tree_keys = rTreeify(linestrings)
-
-    for lat,lon in tqdm(points):
+    (tree, tree_keys) = features_to_rtree(linestrings)
+    for (lat, lon) in tqdm(points):
         p = np.array([lat, lon])
         lstr_copy = deepcopy(linestrings)
         lstr_copy = find_intersection(lstr_copy, tree, tree_keys, p, 0.01)
@@ -98,10 +93,9 @@ def project_points_to_linestrings(points, linestrings):
                 norm = normal(p, segments[i], segments[i+1])
                 dist = norm.dot(norm)
                 if dist < min_proj[0]:
-                    proj = project_point_to_segment(p, segments[i], segments[i+1])
+                    proj = project_point_onto_segment(p, segments[i], segments[i+1])
                     min_proj = [dist, proj, np.array(segments[i]), np.array(segments[i+1])]
         projections.append(min_proj)
-
     return [p[1:] for p in projections]
 
 def load_road_segments(fname):
@@ -110,14 +104,16 @@ def load_road_segments(fname):
     return linestrings
 
 def to_networkx(graph_ql):
-    ''' Creates and returns a geojson graph generated by the geoql function node_edge_graph into a networkx representation'''
-    G = nx.Graph()
+    '''
+    Creates and returns a GeoJSON graph generated by the geoql function
+    node_edge_graph into a networkx representation.
+    '''
+    G = networkx.Graph()
     for j, feature in enumerate(graph_ql.features):
         if feature.type == "Point":
             G.add_node(tuple(feature.coordinates))
         elif feature.type == "Feature":
             coords = [tuple(c) for c in feature.geometry.coordinates]
-
             for i in range(len(coords)-1):
                 G.add_edge(coords[i], coords[i+1], index=j)
     return G
@@ -128,14 +124,12 @@ def find_connected_segment_indices(obj):
     indices = set()
     for v0, v1 in G.edges():
         indices.add(G[v0][v1]['index'])
-
     obj.features = [obj.features[i] for i in indices]
     return obj
 
 def generate_student_stops(student_features, numStops=5000, loadFrom=None):
-    # We assume that the order of stops will not change at any point
-
-    # We don't want to do anything to d2d stops
+    # We assume that the order of stops will not change at any point.
+    # We don't want to do anything to d2d stops.
     #d2d_stops = [f['geometry']['coordinates'][0]
     #   for f in student_features['features']
     #   if f['properties']['pickup'] == 'd2d']
@@ -145,30 +139,27 @@ def generate_student_stops(student_features, numStops=5000, loadFrom=None):
                for feature in student_features['features']
                if feature['properties']['pickup'] == 'corner']
 
-    # get means from pickle or generate
+    # Get means from pickle or generate.
     if loadFrom:
         k_fit = pickle.load(open(loadFrom, 'rb'))
         corner_stops = k_fit['corner_stops']
         labels = k_fit['labels']
     else:
-        #generate means for corner students
+        # Generate means for corner students.
         kmeans = KMeans(n_clusters=numStops-len(d2d_stops), random_state=0)
         k_fit = kmeans.fit(corner_students)
         corner_stops = k_fit.cluster_centers_
         labels = k_fit.labels_
 
-        # Write kmeans results to a file
+        # Write kmeans results to a file.
         with open('output/kmeans', 'wb') as f:
             f.write(pickle.dumps({'corner_stops': corner_stops, 'labels': labels}))
+        print('K-means output written.', flush=True)
 
-        print('Kmeans written', flush=True)
-
-    # get linestrings from roadsegments
+    # Get LineString entries from road segment data.
     linestrings = load_road_segments('input/road-network-extract-missing.geojson')
     linestrings = find_connected_segment_indices(linestrings)
-    
     projected_corner_stops = project_points_to_linestrings(corner_stops, linestrings)
-   
     return list(d2d_stops), list(projected_corner_stops)
 
 def seperate_stops_by_school(stops, students, labels) :
@@ -213,13 +204,10 @@ with open('corner', 'wb') as f:
 import time
    
 student_features = geojson.loads(open('output/students.geojson', 'r').read())
-
 start = time.time()
 d2d, corner = generate_student_stops(student_features, loadFrom='output/kmeans')
 end = time.time()
-
 all_stops = seperate_stops_by_school(stops, students, labels)
-
 with open('output/timelog', 'w') as f:
     f.write(str(end-start))
 '''
@@ -227,6 +215,3 @@ with open('output/timelog', 'w') as f:
 #    f.write(pickle.dumps(stops))
 
 #run()
-
-
-
