@@ -71,7 +71,6 @@ class Grid():
         (rtree_nodes, rtree_edges) = self.segments_rtree(self.segments)
         self.rtree_nodes = rtree_nodes
         self.rtree_edges = rtree_edges
-        
 
 if __name__ == "__main__":
     # The following is used to generate the "prepared" road segment data.
