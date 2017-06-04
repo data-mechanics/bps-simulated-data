@@ -41,14 +41,13 @@ def compile_xlsx(file_students_geojson, file_buses_json, file_compiled_xlsx):
         ('Student Longitude', lambda f: float(f['geometry']['coordinates'][0][1])),
         ('Pickup Type', lambda f: f['properties'].get('pickup')),
         ('Grade', lambda f: f['properties'].get('grade')),
-        #('Geocode', lambda f: f['properties'].get('geocode')),
-        #('Neighborhood Safety Score', lambda f: f['properties'].get('safety')),
         ('Proposed Maximium Walk to Stop Distance', lambda f: f['properties'].get('walk')),
-        #('Assigned School', lambda f: f['properties'].get('school')),
         ('Current School Start Time', lambda f: f['properties'].get('school_start')),
         ('Current School End Time', lambda f: f['properties'].get('school_end')),
-        ('School Latitude', lambda f: float(f['geometry']['coordinates'][1][0])),
-        ('School Longitude', lambda f: float(f['geometry']['coordinates'][1][1]))
+        ('School Latitude', lambda f: float(f['geometry']['coordinates'][-1][0])),
+        ('School Longitude', lambda f: float(f['geometry']['coordinates'][-1][1])),
+        ('Stop Latitude', lambda f: float(f['geometry']['coordinates'][1][0])),
+        ('Stop Longitude', lambda f: float(f['geometry']['coordinates'][1][1]))
       ]
     features = json.load(open(file_students_geojson, 'r'))['features']
     for i in range(0, len(columns)):
