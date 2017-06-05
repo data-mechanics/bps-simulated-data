@@ -84,7 +84,7 @@ def percentages_csv_to_json(file_csv, file_json):
             'total': int(r[3][1]),
             'schools': dict([(f,float(v)) for (f,v) in r[4:] if float(v) > 0])
           }
-    open(file_json, 'w').write(json.dumps(zip_to_percentages, indent=2))
+    open(file_json, 'w').write(json.dumps(zip_to_percentages, indent=2, sort_keys=True))
 
 def zip_to_school_to_location(file_schools, file_student_zip_school_percentages):
     """
