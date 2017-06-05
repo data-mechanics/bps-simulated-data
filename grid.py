@@ -4,8 +4,6 @@ grid.py
 Module containing class for working with a street grid.
 """
 
-import os.path
-import pickle
 import json
 import geojson
 import geopy.distance
@@ -67,26 +65,12 @@ class Grid():
                 edges_rtree.insert(i, shapely.geometry.shape(feature['geometry']).bounds)
         return (nodes_rtree, edges_rtree)
 
-    def __init__(self, file_path, file_pickle = None):
-        # Unpickle if a file exists (if it does not, the generated data will
-        # be pickled once generated).
-        if file_pickle is not None and os.path.isfile(file_pickle):
-            obj = pickle.load(open(file_pickle, 'rb'))
-            self.segments = obj.segments
-            self.graph = obj.graph
-            self.rtree_nodes = obj.rtree_nodes
-            self.rtree_edges = obj.rtree_edges
-            return
-
+    def __init__(self, file_path):
         self.segments = geojson.load(open(file_path, 'r'))
         self.graph = self.segments_networkx(self.segments)
         (rtree_nodes, rtree_edges) = self.segments_rtree(self.segments)
         self.rtree_nodes = rtree_nodes
         self.rtree_edges = rtree_edges
-
-        # Pickle the data if a path is specified.
-        if file_pickle is not None:
-            pickle.dump(self, open(file_pickle, 'wb'))
 
     def intersection_nearest(self, lon_lat):
         (lon, lat) = lon_lat
