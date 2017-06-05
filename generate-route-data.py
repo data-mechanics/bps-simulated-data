@@ -46,7 +46,7 @@ class Route():
         return True
 
     def features(self):
-        return [geojson.Feature(geometry=geojson.LineString(self.waypoints), properties={'bus_id': self.bus_id})]
+        return [geojson.Feature(geometry=geojson.LineString(self.waypoints), properties={'bus_id': self.bus_id, 'load': self.load})]
 
 def stops_to_dict(file_json):
     stops = json.load(open(file_json, 'r'))
@@ -62,7 +62,7 @@ def school_to_stops_rtree(stops):
         mapping[school] = (school_stops, school_rtree)
     return mapping
 
-def school_stops_to_routes(grid, sch_to_stoplist_rtree, buses):
+def school_stops_to_routes(grid, sch_to_stoplist_rtree, buses, max_dist_miles, max_stops):
     routes_by_school = {}
     routes = []
     bus_index = 0
@@ -74,13 +74,16 @@ def school_stops_to_routes(grid, sch_to_stoplist_rtree, buses):
             if stop_index is None:
                 break
             ((lon, lat), load) = stops[stop_index]
-            can_reach_stop = route.stop((lon, lat), load)
-            if can_reach_stop:
-                rtree.delete(stop_index, (lon, lat, lon, lat))
+            reached_stop = route.stop((lon, lat), load)
+            if not reached_stop and\
+               (lon, lat) != (-71.10632060507754, 42.345238669042814): # Individual location cannot be reached in segment graph.
+                print("Could not reach " + str((lon, lat)) + ".")
+            rtree.delete(stop_index, (lon, lat, lon, lat))
 
-            # If the stop cannot be reached or the route is becoming too long,
-            # finish it and start a new one.
-            if (not can_reach_stop) or len(route.stops) > 20 or route.load > 60:
+            # If the route is becoming too long, finish it and start a new one.
+            if route.distance > max_dist_miles or\
+               len(route.stops) > max_stops or\
+               route.load >= bus['Bus Capacity']:
                 # Add school and record the route.
                 route.stop(sch)
                 routes_by_school.setdefault(sch, []).append(route)
@@ -104,7 +107,7 @@ if __name__ == "__main__":
     grid = Grid('input/segments-prepared.geojson')
     buses = json.load(open('output/buses.json', 'r'))
     stops = stops_to_dict('output/stops.json')
-    routes = school_stops_to_routes(grid, school_to_stops_rtree(stops), buses)
+    routes = school_stops_to_routes(grid, school_to_stops_rtree(stops), buses, max_dist_miles=10, max_stops=20)
     open('output/routes.geojson', 'w').write(geojson.dumps(geojson.FeatureCollection([f for r in routes for f in r.features()])))
     open('output/routes.html', 'w').write(geoleaflet.html(geojson.FeatureCollection([f for r in routes for f in r.features()])))
 
