@@ -22,6 +22,7 @@ from tqdm import tqdm
 from grid import Grid # Module local to this project.
 
 def stops_consolidate(grid, schools_to_stops, max_dist_miles, max_load):
+    stops_old_to_new = {}
     for school in tqdm(schools_to_stops, desc='Consolidating bus stops'):
         stops = schools_to_stops[school].items()
         stops_new = []
@@ -32,12 +33,13 @@ def stops_consolidate(grid, schools_to_stops, max_dist_miles, max_load):
                 if geopy.distance.vincenty(stop, stop_new).miles < max_dist_miles and\
                    load_new + load <= max_load:
                     stops_new[i] = (stop_new, load_new + load)
+                    stops_old_to_new[stop] = stop_new
                     consolidated = True
                     break
             if not consolidated:
                 stops_new.append((stop, load))
         schools_to_stops[school] = dict(stops_new)
-    return schools_to_stops
+    return (schools_to_stops, stops_old_to_new)
 
 def students_to_stops(grid, file_students, file_stops):
     students = geojson.load(open(file_students, 'r'))
@@ -56,7 +58,12 @@ def students_to_stops(grid, file_students, file_stops):
         stops[key_sch].setdefault(key_stp, 0)
         stops[key_sch][key_stp] += 1
 
-    stops = stops_consolidate(grid, stops, 0.3, 15)
+    (stops, stops_old_to_new) = stops_consolidate(grid, stops, 0.3, 15)
+
+    for f in tqdm(students.features, desc='Updating student data'):
+        coords = f.geometry.coordinates
+        if coords[1] in stops_old_to_new:
+            f.geometry.coordinates = [coords[0], stops_old_to_new[coords[1]], coords[2]]
 
     open(file_students, 'w').write(geojson.dumps(students, indent=2))
     open(file_stops, 'w').write(json.dumps(stops_to_json_compatible(stops), indent=2))
