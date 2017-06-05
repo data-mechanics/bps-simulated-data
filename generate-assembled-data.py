@@ -41,6 +41,7 @@ def assemble_sheet_assignments(xl_workbook, xl_bold, file_students_geojson):
         #('Current School End Time', lambda f: f['properties'].get('school_end')),
         ('School Latitude', lambda f: float(f['geometry']['coordinates'][-1][0])),
         ('School Longitude', lambda f: float(f['geometry']['coordinates'][-1][1])),
+        ('Bus ID', lambda f: f['properties'].get('bus_id')),
         ('Stop Latitude', lambda f: float(f['geometry']['coordinates'][1][0])),
         ('Stop Longitude', lambda f: float(f['geometry']['coordinates'][1][1]))
       ]
