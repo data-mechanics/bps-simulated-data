@@ -15,6 +15,8 @@ import xlsxwriter
 import rtree
 from tqdm import tqdm
 
+from grid import Grid # Module local to this project.
+
 def properties_by_zipcode(file_properties, file_census_blocks, file_output):
     """
     Build a JSON file grouping all residential properties by zip code
@@ -138,7 +140,7 @@ def school_to_bell_time(school_json):
                     break
     return school_json
 
-def students_simulate(file_schools, file_properties_by_zipcode, file_neighborhood_safety, file_grade_safe_distance, file_student_zip_school_percentages, file_students):
+def students_simulate(grid, file_schools, file_properties_by_zipcode, file_neighborhood_safety, file_grade_safe_distance, file_student_zip_school_percentages, file_students):
     """
     Builds and emits a simulated student data set that randomly assigns
     a school (and other characteristics) to every student based on
@@ -160,7 +162,7 @@ def students_simulate(file_schools, file_properties_by_zipcode, file_neighborhoo
         else:
             for (school, fraction) in tqdm(percentages[zip]['schools'].items(), desc='Processing ZIP ' + zip + progress):
                 if school in schools_to_data:
-                    school_loc = schools_to_data[school]['location']
+                    school_loc = grid.intersection_nearest(schools_to_data[school]['location'])
                     for ty in ['corner', 'd2d']:
                         for student in range(int(1.0 * fraction * percentages[zip][ty])):
                             r = random.randint(10,20)
@@ -246,10 +248,12 @@ if __name__ == "__main__":
     # Set the random seed to ensure determinism.
     random.seed(1)
 
+    grid = Grid('input/segments-prepared.geojson')
     properties_by_zipcode('input/properties.geojson', 'input/census-blocks.geojson', 'input/properties-by-zipcode.json')
     percentages_csv_to_json('input/student-zip-school-percentages.csv', 'input/student-zip-school-percentages.json')
     students =\
       students_simulate(
+          grid,
           'input/schools.csv',
           'input/properties-by-zipcode.json',
           'input/neighborhood-safety.json',
@@ -257,7 +261,7 @@ if __name__ == "__main__":
           'input/student-zip-school-percentages.json',
           'output/students.geojson'
         )
-    open('output/visualization.js', 'w').write('var obj = ' + geojson.dumps(students) + ';')
+    open('output/students.js', 'w').write('var obj = ' + geojson.dumps(students) + ';')
     geojson_to_xlsx('output/students.geojson', 'output/students.xlsx')
 
 ## eof
