@@ -16,8 +16,8 @@ def assemble_sheet_buses(xl_workbook, xl_bold, file_buses_json):
     columns = [
         ('Bus Capacity', lambda b: int(b['Bus Capacity'])),
         ('Bus ID', lambda b: b['Bus ID']),
-        ('Bus Latitude', lambda b: float(b['Bus Latitude'])),
         ('Bus Longitude', lambda b: float(b['Bus Longitude'])),
+        ('Bus Latitude', lambda b: float(b['Bus Latitude'])),
         ('Bus Type', lambda b: b['Bus Type']),
         ('Bus Yard', lambda b: b['Bus Yard']),
         ('Bus Yard Address', lambda b: b['Bus Yard Address'])
@@ -32,18 +32,18 @@ def assemble_sheet_buses(xl_workbook, xl_bold, file_buses_json):
 def assemble_sheet_assignments(xl_workbook, xl_bold, file_students_geojson):
     xl_sheet_assignments = xl_workbook.add_worksheet("Stop-Assignments")
     columns = [
-        ('Student Latitude', lambda f: float(f['geometry']['coordinates'][0][0])),
-        ('Student Longitude', lambda f: float(f['geometry']['coordinates'][0][1])),
+        ('Student Longitude', lambda f: float(f['geometry']['coordinates'][0][0])),
+        ('Student Latitude', lambda f: float(f['geometry']['coordinates'][0][1])),
         ('Pickup Type', lambda f: f['properties'].get('pickup')),
         #('Grade', lambda f: f['properties'].get('grade')),
         ('Maximum Walk Distance', lambda f: f['properties'].get('walk')),
         #('Current School Start Time', lambda f: f['properties'].get('school_start')),
         #('Current School End Time', lambda f: f['properties'].get('school_end')),
-        ('School Latitude', lambda f: float(f['geometry']['coordinates'][-1][0])),
-        ('School Longitude', lambda f: float(f['geometry']['coordinates'][-1][1])),
+        ('School Longitude', lambda f: float(f['geometry']['coordinates'][-1][0])),
+        ('School Latitude', lambda f: float(f['geometry']['coordinates'][-1][1])),
         ('Bus ID', lambda f: f['properties'].get('bus_id')),
-        ('Stop Latitude', lambda f: float(f['geometry']['coordinates'][1][0])),
-        ('Stop Longitude', lambda f: float(f['geometry']['coordinates'][1][1]))
+        ('Stop Longitude', lambda f: float(f['geometry']['coordinates'][1][0])),
+        ('Stop Latitude', lambda f: float(f['geometry']['coordinates'][1][1]))
       ]
     features = json.load(open(file_students_geojson, 'r'))['features']
     for i in range(0, len(columns)):
@@ -56,8 +56,8 @@ def assemble_sheet_routes(xl_workbook, xl_bold, file_routes_geojson):
     xl_sheet_assignments = xl_workbook.add_worksheet("Routes")
     columns = [
         ('Bus ID', lambda e: e[2]),
-        ('Waypoint Latitude', lambda e: e[1]),
-        ('Waypoint Longitude', lambda e: e[0])
+        ('Waypoint Longitude', lambda e: e[0]),
+        ('Waypoint Latitude', lambda e: e[1])
         #('Waypoint Address', lambda e: e[3])
       ]
     rs = geojson.load(open(file_routes_geojson, 'r'))

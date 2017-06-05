@@ -222,8 +222,8 @@ def geojson_to_xlsx(geojson_file, xlsx_file):
         ('Street Number', lambda f: f['properties'].get('number')),
         ('Street Name', lambda f: f['properties'].get('street')),
         ('Zip Code', lambda f: f['properties'].get('zip')),
-        ('Latitude', lambda f: float(f['geometry']['coordinates'][0][0])),
-        ('Longitude', lambda f: float(f['geometry']['coordinates'][0][1])),
+        ('Longitude', lambda f: float(f['geometry']['coordinates'][0][0])),
+        ('Latitude', lambda f: float(f['geometry']['coordinates'][0][1])),
         ('Pickup Type', lambda f: f['properties'].get('pickup')),
         ('Grade', lambda f: f['properties'].get('grade')),
         ('Geocode', lambda f: f['properties'].get('geocode')),
@@ -233,8 +233,8 @@ def geojson_to_xlsx(geojson_file, xlsx_file):
         ('Current School Start Time', lambda f: f['properties'].get('school_start')),
         ('Current School End Time', lambda f: f['properties'].get('school_end')),
         ('School Address', lambda f: f['properties'].get('school_address')),
-        ('School Latitude', lambda f: float(f['geometry']['coordinates'][-1][0])),
-        ('School Longitude', lambda f: float(f['geometry']['coordinates'][-1][1]))
+        ('School Longitude', lambda f: float(f['geometry']['coordinates'][-1][0])),
+        ('School Latitude', lambda f: float(f['geometry']['coordinates'][-1][1]))
       ]
     features = json.load(open(geojson_file, 'r'))['features']
     for i in range(0, len(columns)):
