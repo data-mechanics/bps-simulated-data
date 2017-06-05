@@ -1,8 +1,9 @@
 """
-generate-compiled-data.py
+generate-assembled-data.py
 
-Module for automatically compiling a comprehensive XLSX workbook containing all
-the generated data.
+Module for automatically assembling a comprehensive XLSX workbook containing all
+the generated data (assuming the other data sets have already been individually
+generated).
 """
 
 import json
@@ -10,14 +11,7 @@ import geojson
 import xlsxwriter
 from tqdm import tqdm
 
-def compile_xlsx(file_students_geojson, file_buses_json, file_compiled_xlsx):
-    """
-    Converts a simulated student data set in JSON format into a human-friendly
-    Excel format (with appropriate) changes to field/column names.
-    """
-    xl_workbook = xlsxwriter.Workbook(file_compiled_xlsx)
-    xl_bold = xl_workbook.add_format({'bold': True})
-
+def assemble_sheet_buses(xl_workbook, xl_bold, file_buses_json):
     xl_sheet_buses = xl_workbook.add_worksheet("Buses")
     columns = [
         ('Bus Capacity', lambda b: int(b['Bus Capacity'])),
@@ -35,6 +29,7 @@ def compile_xlsx(file_students_geojson, file_buses_json, file_compiled_xlsx):
         for j in range(0,len(columns)):
             xl_sheet_buses.write(i+1, j, columns[j][1](buses[i]))
 
+def assemble_sheet_assignments(xl_workbook, xl_bold, file_students_geojson):
     xl_sheet_assignments = xl_workbook.add_worksheet("Stop-Assignments")
     columns = [
         ('Student Latitude', lambda f: float(f['geometry']['coordinates'][0][0])),
@@ -56,13 +51,40 @@ def compile_xlsx(file_students_geojson, file_buses_json, file_compiled_xlsx):
         for j in range(0,len(columns)):
             xl_sheet_assignments.write(i+1, j, columns[j][1](features[i]))
 
-    xl_sheet_buses = xl_workbook.add_worksheet("Routes")
+def assemble_sheet_routes(xl_workbook, xl_bold, file_routes_geojson):
+    xl_sheet_assignments = xl_workbook.add_worksheet("Routes")
+    columns = [
+        ('Bus ID', lambda e: e[2]),
+        ('Waypoint Latitude', lambda e: e[1]),
+        ('Waypoint Longitude', lambda e: e[0])
+        #('Waypoint Address', lambda e: e[3])
+      ]
+    rs = geojson.load(open(file_routes_geojson, 'r'))
+    entries = [[p[0], p[1], f['properties']['bus_id'], '?'] for f in rs.features for p in f['geometry']['coordinates']]
+    for i in range(0, len(columns)):
+        xl_sheet_assignments.write(0, i, columns[i][0], xl_bold)
+    for i in tqdm(range(len(entries)), desc="Converting GeoJSON coordinates to XLSX rows (Routes)"):
+        for j in range(0,len(columns)):
+            xl_sheet_assignments.write(i+1, j, columns[j][1](entries[i]))
 
+def assemble_xlsx(file_buses_json, file_students_geojson, file_routes_geojson, file_assembled_xlsx):
+    '''
+    Converts a simulated student data set in JSON format into a human-friendly
+    Excel format (with appropriate) changes to field/column names.
+    '''
+    xl_workbook = xlsxwriter.Workbook(file_assembled_xlsx)
+    xl_bold = xl_workbook.add_format({'bold': True})
+    assemble_sheet_buses(xl_workbook, xl_bold, file_buses_json)
+    assemble_sheet_assignments(xl_workbook, xl_bold, file_students_geojson)
+    assemble_sheet_routes(xl_workbook, xl_bold, file_routes_geojson)
     xl_workbook.close()
 
-def main():
-    compile_xlsx('output/students.geojson', 'output/buses.json', 'output/compiled.xlsx')
-
-main()
+if __name__ == "__main__":
+    assemble_xlsx(
+        'output/buses.json',
+        'output/students.geojson',
+        'output/routes.geojson',
+        'output/assembled.xlsx'
+      )
 
 ## eof
