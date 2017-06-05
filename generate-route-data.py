@@ -146,7 +146,7 @@ if __name__ == "__main__":
     buses = json.load(open('output/buses.json', 'r'))
     students = geojson.load(open('output/students.geojson', 'r'))
     stops = stops_to_dict('output/stops.json')    
-    routes = school_stops_to_routes(grid, 'output/students.geojson', school_to_stops(stops), buses, max_dist_miles=20, max_stops=40)
+    routes = school_stops_to_routes(grid, 'output/students.geojson', school_to_stops(stops), buses, max_dist_miles=30, max_stops=60)
     open('output/routes.geojson', 'w').write(geojson.dumps(geojson.FeatureCollection([f for r in routes for f in r.features()])))
     open('output/routes.html', 'w').write(geoleaflet.html(geojson.FeatureCollection([f for r in routes for f in r.features()])))
 
