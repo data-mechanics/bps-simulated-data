@@ -2,7 +2,11 @@
 .DS_Store
 .Rhistory
 
-# Python files.
+# Python environment files.
 __pycache__
 
 # Generated files.
+output/buses.json
+output/stops.json
+output/students.js
+output/routes.html
