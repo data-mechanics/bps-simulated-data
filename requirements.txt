@@ -4,6 +4,7 @@ geopy
 shapely
 geoql
 geoleaflet
+decorator
 folium
 xlrd
 xlsxwriter
