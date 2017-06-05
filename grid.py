@@ -88,6 +88,11 @@ class Grid():
         if file_pickle is not None:
             pickle.dump(self, open(file_pickle, 'wb'))
 
+    def intersection_nearest(self, lon_lat):
+        (lon, lat) = lon_lat
+        index = next(self.rtree_nodes.nearest((lon,lat,lon,lat), 1))
+        return self.segments['features'][index].coordinates
+
 if __name__ == "__main__":
     # The following is used to generate the "prepared" road segment data.
     Grid.prepare('input/segments-boston.geojson', 'input/segments-prepared.geojson')

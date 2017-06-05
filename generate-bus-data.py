@@ -9,6 +9,8 @@ import json
 import xlrd
 from tqdm import tqdm
 
+from grid import Grid # Module local to this project.
+
 def str_ascii_only(s):
     '''
     Convert a string to ASCII and strip it of whitespace pre-/suffix.
@@ -32,9 +34,9 @@ def xlsx_cell_to_json(column, cell):
     return None
 
 def xlsx_to_json(file_xlsx, file_json):
-    """
+    '''
     Converts a bus data XLSX spreadsheet into a JSON file.
-    """
+    '''
     xl_workbook = xlrd.open_workbook(file_xlsx)
     xl_sheet = xl_workbook.sheet_by_index(0)
     row = xl_sheet.row(0)
@@ -47,13 +49,24 @@ def xlsx_to_json(file_xlsx, file_json):
             if value is not None:
                 entry[field] = value
         entries.append(entry)
-
+        
     # Emit the file mapping each zip code to all properties in that zip code.
     open(file_json, 'w').write(json.dumps(entries, indent=2, sort_keys=True))
 
-def main():
-    xlsx_to_json('input/bps-buses.xlsx', 'output/buses.json')
+def buses_locations_move_onto_grid(grid, file_json):
+    '''
+    Move all bus locations onto the grid.
+    '''
+    buses = json.load(open(file_json, 'r'))
+    for bus in tqdm(buses, desc='Moving bus locations onto grid'):
+        (lon, lat) = grid.intersection_nearest((bus['Bus Longitude'], bus['Bus Latitude']))
+        bus['Bus Longitude'] = lon
+        bus['Bus Latitude'] = lat
+    open(file_json, 'w').write(json.dumps(buses, indent=2, sort_keys=True))
 
-main()
+if __name__ == "__main__":
+    grid = Grid('input/segments-prepared.geojson')
+    xlsx_to_json('input/bps-buses.xlsx', 'output/buses.json')
+    buses_locations_move_onto_grid(grid, 'output/buses.json')
 
 ## eof
