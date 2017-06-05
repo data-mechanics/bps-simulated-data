@@ -228,7 +228,7 @@ def geojson_to_xlsx(geojson_file, xlsx_file):
         ('Grade', lambda f: f['properties'].get('grade')),
         ('Geocode', lambda f: f['properties'].get('geocode')),
         ('Neighborhood Safety Score', lambda f: f['properties'].get('safety')),
-        ('Proposed Maximium Walk to Stop Distance', lambda f: f['properties'].get('walk')),
+        ('Maximum Walk Distance', lambda f: f['properties'].get('walk')),
         ('Assigned School', lambda f: f['properties'].get('school')),
         ('Current School Start Time', lambda f: f['properties'].get('school_start')),
         ('Current School End Time', lambda f: f['properties'].get('school_end')),
