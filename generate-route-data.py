@@ -113,7 +113,7 @@ def school_stops_to_routes(grid, file_students, sch_to_stoplist, buses, max_dist
             if len(stops) > 0 and\
                ( route.distance >= max_dist_miles or\
                  len(route.stops) >= max_stops or\
-                 route.load >= bus['Bus Capacity'] ):
+                 route.load >= bus['Bus Capacity'] - 5 ):
                 # Add school and record the route.
                 route.stop(sch)
                 routes_by_school.setdefault(sch, []).append(route)
