@@ -1,4 +1,4 @@
-# Simulated Student Data for Boston Public Schools
+# Simulated Student and Bus Route Data for Boston Public Schools
 Tool for automatically generating simulated data sets of Boston Public Schools students, their school assignments, their bus stop assignments, and bus routes.
 
 ## Usage
