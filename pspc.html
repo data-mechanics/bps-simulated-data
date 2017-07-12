@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.0.3/leaflet.css" />
+  </head>
+  <body style="width:100%; height:100%; margin:0; padding:0;">
+	<div id="leaflet" style="width:100vw; height:100vh;"></div>
+	<script src="pspc.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.0.3/leaflet.js"></script>
+	<script>
+      var colors = ['#FF0000', '#00FF00', '#0000FF', '#FF00FF'];
+      function randomColor() {
+        var color = '', letters = '0123456'; //789ABCDEF
+        for (var i=0; i<6; i++) {color += letters[Math.floor(Math.random() * letters.length)];}
+        return '#' + color;
+      }
+      var leaflet = L.map('leaflet').setView([42.35492416678054, -71.06451283091724], 13);
+      L.tileLayer("https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw", {
+        maxZoom:18, attribution:'', id:'mapbox.light'
+      }).addTo(leaflet);
+      function onEachFeature(feature, layer) {
+        if (feature.properties) {
+          var popupContent = "<p>" + feature.properties.name + '-' + feature.properties.osm_id + ".</p>";
+          if (feature.properties.popupContent)
+              popupContent += feature.properties.popupContent;
+          layer.bindPopup(popupContent);
+        }
+      }
+      var nodes = [];
+      L.geoJson(obj, {
+        filter: function (feature, layer) { return true; },
+        //onEachFeature: onEachFeature,
+        style: function (feature) { return {"color": randomColor()}; },
+        pointToLayer:
+          function (feature, latlng) {
+            var node = L.circleMarker(latlng, {radius:4, weight:0.1, fillColor:"#666666", color:"#666666", opacity:1, fillOpacity:1});
+            node.on('click', function() {
+              for (var i = 0; i < feature.properties.next.length; i++) {
+                for (var j = 0; j < feature.properties.next[i].length; j++) {
+                  nodes[feature.properties.next[i][j]].vis.setStyle({fillColor:colors[i], color:colors[i]});
+                }
+              }
+            });
+            nodes.push({'dat':feature, 'vis':node});
+            return node;
+          }
+      }).addTo(leaflet);
+	</script>
+  </body>
+</html>

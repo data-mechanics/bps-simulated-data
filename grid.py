@@ -29,6 +29,9 @@ class Grid():
                 features.append(f)
         segments.features = features
         segments = segments.node_edge_graph()
+
+        segments = segments.keep_within_radius((42.3551, -71.0656), 0.6, 'miles')
+
         segments.dump(open(file_segments_filtered, 'w'), sort_keys=True)
 
     @staticmethod
